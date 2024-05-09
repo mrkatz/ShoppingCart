@@ -30,6 +30,13 @@ return [
 
         'table' => 'shoppingcart',
 
+        'save_on_logout' => false,
+
+        'save_instances' => [
+            'default',
+            // 'wishlist',
+        ],
+
     ],
 
     /*

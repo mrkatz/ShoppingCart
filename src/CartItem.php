@@ -7,9 +7,8 @@ use Mrkatz\Shoppingcart\Contracts\Buyable;
 use Illuminate\Contracts\Support\Jsonable;
 
 use Illuminate\Support\Arr;
-use iterable;
 
-class CartItem implements Arrayable, Jsonable, iterable
+class CartItem implements Arrayable, Jsonable
 {
     /**
      * The rowID of the cart item.

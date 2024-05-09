@@ -4,8 +4,12 @@ namespace Mrkatz\Tests\Shoppingcart;
 
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\Factory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Mockery;
 use Mrkatz\Shoppingcart\Cart;
@@ -16,6 +20,8 @@ use Mrkatz\Shoppingcart\Exceptions\UnknownModelException;
 use Mrkatz\Shoppingcart\ShoppingcartServiceProvider;
 use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
 use Mrkatz\Tests\Shoppingcart\Fixtures\ProductModel;
+use Mrkatz\Tests\Shoppingcart\Fixtures\TestUser;
+use Mrkatz\Tests\Shoppingcart\Fixtures\TestUserFactory;
 use PHPUnit\Framework\Assert;
 
 class CartTest extends TestCase
@@ -322,7 +328,7 @@ class CartTest extends TestCase
     public function test_it_will_throw_an_exception_if_a_rowid_was_not_found()
     {
         $this->expectException(InvalidRowIDException::class);
-    $this->expectExceptionMessage('The cart does not contain rowId none-existing-rowid.');
+        $this->expectExceptionMessage('The cart does not contain rowId none-existing-rowid.');
         $cart = $this->getCart();
 
         $cart->add(new BuyableProduct);
@@ -764,6 +770,70 @@ class CartTest extends TestCase
         Event::assertDispatched('cart.stored');
     }
 
+    public function test_it_can_store_multiple_carts_in_a_database()
+    {
+        $this->artisan('migrate', [
+            '--database' => 'testing',
+        ]);
+        $identifier = '123';
+
+        $instances = ['cart1' => null, 'cart2' => null];
+        Event::fake();
+        foreach ($instances as $cartName => $content) {
+            $cart = $this->getCart()->instance($cartName);
+
+            $cart->add(new BuyableProduct);
+
+            $cart->store($identifier . $cartName);
+
+            $instances[$cartName] = serialize($cart->content());
+
+            Event::assertDispatched('cart.stored');
+        }
+
+        foreach ($instances as $cartName => $content) {
+            $this->assertDatabaseHas('shoppingcart', ['identifier' => $identifier . $cartName, 'instance' => $cartName, 'content' => $content]);
+        }
+    }
+
+    public function test_it_can_store_multiple_carts_in_a_database_onLogout_if_Set()
+    {
+        $this->artisan('migrate', [
+            '--database' => 'testing',
+        ]);
+
+        config(['cart.database.save_on_logout' => true]);
+        config(['cart.database.save_instances' => ['cart1', 'cart2']]);
+
+        $user = new TestUser([
+            'id' => 1,
+            'name' => 'user'
+        ]);
+
+        Auth::login($user);
+
+        $instances = ['cart1' => null, 'cart2' => null];
+
+        foreach ($instances as $cartName => $content) {
+            $cart = $this->getCart()->instance($cartName);
+
+            $cart->add(new BuyableProduct);
+
+            $instances[$cartName] = serialize($cart->content());
+        }
+
+        Auth::logout();
+
+        foreach ($instances as $cartName => $content) {
+            $this->assertDatabaseHas('shoppingcart', ['identifier' => $user->id, 'instance' => $cartName, 'content' => $content]);
+        }
+        Auth::login($user);
+
+        foreach ($instances as $cartName => $content) {
+            $this->assertDatabaseHas('shoppingcart', ['identifier' => $user->id, 'instance' => $cartName, 'content' => $content]);
+        }
+    }
+
     public function test_it_can_update_the_cart_in_database()
     {
         $this->artisan('migrate', [
@@ -849,13 +919,15 @@ class CartTest extends TestCase
     {
         $this->app['config']->set('cart.destroy_on_logout', true);
 
+        dump(config('cart'));
+
         $this->app->instance(SessionManager::class, Mockery::mock(SessionManager::class, function ($mock) {
             $mock->shouldReceive('forget')->once()->with('cart');
         }));
 
         $user = Mockery::mock(Authenticatable::class);
 
-        event(new Logout('web',$user));
+        event(new Logout('web', $user));
     }
 
     /**
