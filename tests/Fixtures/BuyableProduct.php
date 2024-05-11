@@ -2,6 +2,7 @@
 
 namespace Mrkatz\Tests\Shoppingcart\Fixtures;
 
+use InvalidArgumentException;
 use Mrkatz\Shoppingcart\Contracts\Buyable;
 
 class BuyableProduct implements Buyable
@@ -22,6 +23,11 @@ class BuyableProduct implements Buyable
     private $price;
 
     /**
+     * @var float
+     */
+    private $comparePrice;
+
+    /**
      * BuyableProduct constructor.
      *
      * @param int|string $id
@@ -32,7 +38,15 @@ class BuyableProduct implements Buyable
     {
         $this->id = $id;
         $this->name = $name;
-        $this->price = $price;
+
+        if (is_array($price)) {
+            $this->price = $price['price'];
+            $this->comparePrice = $price['comparePrice'];
+        } elseif (strlen($price) < 0 || !is_numeric($price)) {
+            throw new InvalidArgumentException('Please supply a valid price.');
+        } else {
+            $this->price = floatval($price);
+        }
     }
 
     /**
@@ -63,5 +77,15 @@ class BuyableProduct implements Buyable
     public function getBuyablePrice($options = null)
     {
         return $this->price;
+    }
+
+    /**
+     * Get the price of the Buyable item.
+     *
+     * @return float
+     */
+    public function getBuyableComparePrice($options = null)
+    {
+        return $this->comparePrice;
     }
 }

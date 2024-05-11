@@ -35,7 +35,7 @@ class ShoppingCartEventListener
             $this->session->forget('cart');
         } elseif (config('cart.database.save_on_logout')) {
 
-            foreach (config('cart.database.save_instances') as $cart) {
+            foreach (Cart::getInstances() as $cart) {
                 if (Cart::instance($cart)->count() > 0) {
                     Cart::instance($cart)->store($event->user->id);
                 }

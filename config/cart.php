@@ -28,7 +28,11 @@ return [
 
         'connection' => null,
 
-        'table' => 'shoppingcart',
+        'table' => [
+            'shoppingcart'  => 'shoppingcart',
+            'coupons'       => 'coupons',
+            'fees'          => 'cartfees',
+        ],
 
         'save_on_logout' => false,
 
@@ -50,6 +54,19 @@ return [
     */
 
     'destroy_on_logout' => false,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Coupon Settings
+    |--------------------------------------------------------------------------
+    |
+    | 
+    |
+    */
+
+    'coupon' => [
+        'allow_multiple' => false,
+    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -11,6 +11,7 @@ use Mrkatz\Shoppingcart\Contracts\Buyable;
 use Mrkatz\Shoppingcart\Exceptions\UnknownModelException;
 use Mrkatz\Shoppingcart\Exceptions\InvalidRowIDException;
 use Mrkatz\Shoppingcart\Exceptions\CartAlreadyStoredException;
+use Mrkatz\Shoppingcart\Exceptions\CouponException;
 
 class Cart
 {
@@ -36,6 +37,15 @@ class Cart
      * @var string
      */
     private $instance;
+
+    /**
+     * Holds the coupons.
+     *
+     * @var array
+     */
+    private $coupons = [];
+
+    protected $discount = 0;
 
     /**
      * Cart constructor.
@@ -74,6 +84,16 @@ class Cart
     public function currentInstance()
     {
         return str_replace('cart.', '', $this->instance);
+    }
+
+    /**
+     * Gets all current instances inside the session.
+     *
+     * @return mixed
+     */
+    public static function getInstances()
+    {
+        return array_keys(session('cart'));
     }
 
     /**
@@ -189,7 +209,7 @@ class Cart
     {
         $content = $this->getContent();
 
-        if ( ! $content->has($rowId))
+        if (!$content->has($rowId))
             throw new InvalidRowIDException("The cart does not contain rowId {$rowId}.");
 
         return $content->get($rowId);
@@ -244,8 +264,10 @@ class Cart
         $content = $this->getContent();
 
         $total = $content->reduce(function ($total, CartItem $cartItem) {
-            return $total + ($cartItem->qty * $cartItem->priceTax);
+            return $total + ($cartItem->qty * $cartItem->priceTax());
         }, 0);
+
+        $total -= $this->discount;
 
         return $this->numberFormat($total, $decimals, $decimalPoint, $thousandSeperator);
     }
@@ -263,7 +285,7 @@ class Cart
         $content = $this->getContent();
 
         $tax = $content->reduce(function ($tax, CartItem $cartItem) {
-            return $tax + ($cartItem->qty * $cartItem->tax);
+            return $tax + ($cartItem->qty * $cartItem->tax());
         }, 0);
 
         return $this->numberFormat($tax, $decimals, $decimalPoint, $thousandSeperator);
@@ -282,7 +304,7 @@ class Cart
         $content = $this->getContent();
 
         $subTotal = $content->reduce(function ($subTotal, CartItem $cartItem) {
-            return $subTotal + ($cartItem->qty * $cartItem->price);
+            return $subTotal + ($cartItem->qty * $cartItem->price());
         }, 0);
 
         return $this->numberFormat($subTotal, $decimals, $decimalPoint, $thousandSeperator);
@@ -310,7 +332,7 @@ class Cart
      */
     public function associate($rowId, $model)
     {
-        if(is_string($model) && ! class_exists($model)) {
+        if (is_string($model) && !class_exists($model)) {
             throw new UnknownModelException("The supplied model {$model} does not exist.");
         }
 
@@ -357,17 +379,17 @@ class Cart
 
 
         $this->getConnection()
-             ->table($this->getTableName())
-             ->where('identifier', $identifier)
-             ->where('instance', $this->currentInstance())
-             ->delete();
+            ->table($this->getTableName())
+            ->where('identifier', $identifier)
+            ->where('instance', $this->currentInstance())
+            ->delete();
 
 
         $this->getConnection()->table($this->getTableName())->insert([
             'identifier' => $identifier,
             'instance' => $this->currentInstance(),
             'content' => serialize($content),
-            'created_at'=> new \DateTime()
+            'created_at' => new \DateTime()
         ]);
 
         $this->events->dispatch('cart.stored');
@@ -381,7 +403,7 @@ class Cart
      */
     public function restore($identifier)
     {
-        if( ! $this->storedCartWithIdentifierExists($identifier)) {
+        if (!$this->storedCartWithIdentifierExists($identifier)) {
             return;
         }
 
@@ -406,24 +428,72 @@ class Cart
         $this->session->put($this->instance, $content);
 
         $this->instance($currentInstance);
-
     }
-
-
 
     /**
      * Deletes the stored cart with given identifier
      *
      * @param mixed $identifier
      */
-    public function deleteStoredCart($identifier) {
+    public function deleteStoredCart($identifier)
+    {
         $this->getConnection()
-             ->table($this->getTableName())
-             ->where('identifier', $identifier)
-             ->delete();
+            ->table($this->getTableName())
+            ->where('identifier', $identifier)
+            ->delete();
     }
 
+    public function addCoupon(CartCoupon $coupon)
+    {
+        if ($coupon->canApply($this)) {
+            if (!config('cart.coupon.allow_multiple')) {
+                $this->coupons = [];
+            }
 
+            $this->coupons[$coupon->code] = $coupon;
+
+            $content = $this->getContent();
+
+            foreach ($content as $cartItem) {
+                $cartItem->addCoupon($coupon);
+            }
+
+            $this->discount = 0;
+
+            foreach ($this->coupons as $coupon) {
+                if ($coupon->type === 'value') {
+                    $this->discount += $coupon->value;
+                }
+            }
+
+            return $this;
+        }
+        $coupon->throwError('Invalid Coupon');
+    }
+
+    public function clearCoupons()
+    {
+        $content = $this->getContent();
+        foreach ($content as $cartItem) {
+            if (!config('cart.coupon.allow_multiple')) {
+                $cartItem->coupons = [];
+            }
+        }
+        $this->coupons = [];
+    }
+
+    public function cartDiscount()
+    {
+        // $discount = 0;
+        // $content = $this->getContent();
+        // foreach ($content as $cartItem) {
+        //     $discount += $cartItem->discount();
+        // }
+
+        // $discount += $this->discount;
+
+        return $this->discount;
+    }
 
     /**
      * Magic method to make accessing the total, tax and subtotal properties possible.
@@ -433,15 +503,15 @@ class Cart
      */
     public function __get($attribute)
     {
-        if($attribute === 'total') {
+        if ($attribute === 'total') {
             return $this->total();
         }
 
-        if($attribute === 'tax') {
+        if ($attribute === 'tax') {
             return $this->tax();
         }
 
-        if($attribute === 'subtotal') {
+        if ($attribute === 'subtotal') {
             return $this->subtotal();
         }
 
@@ -487,7 +557,7 @@ class Cart
             $cartItem->setQuantity($qty);
         }
 
-        if(isset($taxrate) && is_numeric($taxrate)) {
+        if (isset($taxrate) && is_numeric($taxrate)) {
             $cartItem->setTaxRate($taxrate);
         } else {
             $cartItem->setTaxRate(config('cart.tax'));
@@ -504,7 +574,7 @@ class Cart
      */
     private function isMulti($item)
     {
-        if ( ! is_array($item)) return false;
+        if (!is_array($item)) return false;
 
         return is_array(head($item)) || head($item) instanceof Buyable;
     }
@@ -537,7 +607,7 @@ class Cart
      */
     protected function getTableName()
     {
-        return config('cart.database.table', 'shoppingcart');
+        return config('cart.database.table.shoppingcart', 'shoppingcart');
     }
 
     /**
@@ -563,13 +633,13 @@ class Cart
      */
     private function numberFormat($value, $decimals, $decimalPoint, $thousandSeperator)
     {
-        if(is_null($decimals)){
+        if (is_null($decimals)) {
             $decimals = is_null(config('cart.format.decimals')) ? 2 : config('cart.format.decimals');
         }
-        if(is_null($decimalPoint)){
+        if (is_null($decimalPoint)) {
             $decimalPoint = is_null(config('cart.format.decimal_point')) ? '.' : config('cart.format.decimal_point');
         }
-        if(is_null($thousandSeperator)){
+        if (is_null($thousandSeperator)) {
             $thousandSeperator = is_null(config('cart.format.thousand_seperator')) ? ',' : config('cart.format.thousand_seperator');
         }
 

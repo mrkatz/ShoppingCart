@@ -13,16 +13,15 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Mockery;
 use Mrkatz\Shoppingcart\Cart;
+use Mrkatz\Shoppingcart\CartCoupon;
 use Mrkatz\Shoppingcart\CartItem;
-use Mrkatz\Shoppingcart\Exceptions\InvalidArgumentException;
 use Mrkatz\Shoppingcart\Exceptions\InvalidRowIDException;
 use Mrkatz\Shoppingcart\Exceptions\UnknownModelException;
+use Mrkatz\Shoppingcart\Models\Coupon;
 use Mrkatz\Shoppingcart\ShoppingcartServiceProvider;
 use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
 use Mrkatz\Tests\Shoppingcart\Fixtures\ProductModel;
 use Mrkatz\Tests\Shoppingcart\Fixtures\TestUser;
-use Mrkatz\Tests\Shoppingcart\Fixtures\TestUserFactory;
-use PHPUnit\Framework\Assert;
 
 class CartTest extends TestCase
 {
@@ -633,12 +632,12 @@ class CartTest extends TestCase
 
         $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
 
-        $this->assertEquals('1.500,00', $cartItem->subtotal(2, ',', '.'));
+        $this->assertEquals('1.500,00', $cartItem->format('subtotal', 2, ',', '.'));
     }
 
     public function test_it_can_calculate_tax_based_on_the_default_tax_rate_in_the_config()
     {
-        // $this->app['config']->set('cart.tax', 21);
+        config(['cart.tax' => 21]);
 
         $cart = $this->getCart();
 
@@ -670,7 +669,7 @@ class CartTest extends TestCase
 
         $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
 
-        $this->assertEquals('2.100,00', $cartItem->tax(2, ',', '.'));
+        $this->assertEquals('2.100,00', $cartItem->format('tax', 2, ',', '.'));
     }
 
     public function test_it_can_calculate_the_total_tax_for_all_cart_items()
@@ -713,6 +712,19 @@ class CartTest extends TestCase
         $this->assertEquals('5000,00', $cart->subtotal(2, ',', ''));
     }
 
+    public function test_it_can_set_and_retreave_comparePrice()
+    {
+        $cart = $this->getCart();
+
+        $cart->add(new BuyableProduct(1, 'Some title', ['price' => 1000.00, 'comparePrice' => 2200.00]), 1);
+        $cart->add(new BuyableProduct(2, 'Some title', 2000.00), 2);
+
+        $this->assertEquals('5000,00', $cart->subtotal(2, ',', ''));
+
+        $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
+        $this->assertEquals('2200.00', $cartItem->comparePrice);
+    }
+
     public function test_it_can_return_cart_formated_numbers_by_config_values()
     {
         $this->setConfigFormat(2, ',', '');
@@ -741,12 +753,12 @@ class CartTest extends TestCase
 
         $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
 
-        $this->assertEquals('2000,00', $cartItem->price());
-        $this->assertEquals('2420,00', $cartItem->priceTax());
-        $this->assertEquals('4000,00', $cartItem->subtotal());
-        $this->assertEquals('4840,00', $cartItem->total());
-        $this->assertEquals('420,00', $cartItem->tax());
-        $this->assertEquals('840,00', $cartItem->taxTotal());
+        $this->assertEquals('2000,00', $cartItem->price(true));
+        $this->assertEquals('2420,00', $cartItem->priceTax(true));
+        $this->assertEquals('4000,00', $cartItem->subtotal(true));
+        $this->assertEquals('4840,00', $cartItem->total(true));
+        $this->assertEquals('420,00', $cartItem->tax(true));
+        $this->assertEquals('840,00', $cartItem->taxTotal(true));
     }
 
     public function test_it_can_store_the_cart_in_a_database()
@@ -893,8 +905,20 @@ class CartTest extends TestCase
         $this->assertItemsInCart(0, $cart);
     }
 
+    public function test_it_can_get_all_instances()
+    {
+        $cart = $this->getCart();
+
+        $cart->instance('cart1')->add(new BuyableProduct(1, 'Some title', 1000.00), 1);
+        $cart->instance('cart2')->add(new BuyableProduct(2, 'Some title', 2000.00), 2);
+
+        $this->assertEquals(['cart1', 'cart2'], $cart->getInstances());
+    }
+
     public function test_it_can_calculate_all_values()
     {
+        $this->setConfigFormat(2, '.', '');
+
         $cart = $this->getCart();
 
         $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
@@ -903,23 +927,21 @@ class CartTest extends TestCase
 
         $cart->setTax('027c91341fd5cf4d2579b49c4b6a90da', 19);
 
-        $this->assertEquals(10.00, $cartItem->price(2));
-        $this->assertEquals(11.90, $cartItem->priceTax(2));
-        $this->assertEquals(20.00, $cartItem->subtotal(2));
-        $this->assertEquals(23.80, $cartItem->total(2));
-        $this->assertEquals(1.90, $cartItem->tax(2));
-        $this->assertEquals(3.80, $cartItem->taxTotal(2));
+        $this->assertEquals(10.00, $cartItem->price());
+        $this->assertEquals(11.90, $cartItem->priceTax());
+        $this->assertEquals(20.00, $cartItem->subtotal());
+        $this->assertEquals(23.80, $cartItem->total());
+        $this->assertEquals(1.90, $cartItem->tax());
+        $this->assertEquals(3.80, $cartItem->taxTotal());
 
-        $this->assertEquals(20.00, $cart->subtotal(2));
-        $this->assertEquals(23.80, $cart->total(2));
-        $this->assertEquals(3.80, $cart->tax(2));
+        $this->assertEquals(20.00, $cart->subtotal());
+        $this->assertEquals(23.80, $cart->total());
+        $this->assertEquals(3.80, $cart->tax());
     }
 
     public function test_it_will_destroy_the_cart_when_the_user_logs_out_and_the_config_setting_was_set_to_true()
     {
         $this->app['config']->set('cart.destroy_on_logout', true);
-
-        dump(config('cart'));
 
         $this->app->instance(SessionManager::class, Mockery::mock(SessionManager::class, function ($mock) {
             $mock->shouldReceive('forget')->once()->with('cart');
@@ -928,6 +950,154 @@ class CartTest extends TestCase
         $user = Mockery::mock(Authenticatable::class);
 
         event(new Logout('web', $user));
+    }
+
+    public function test_it_can_add_a_valid_percentage_coupon()
+    {
+        $this->setConfigFormat(2, '.', '');
+
+        $cart = $this->getCart();
+        $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cart->setTax('027c91341fd5cf4d2579b49c4b6a90da', 19);
+
+        $coupon = new CartCoupon('10off', 0.1, 'percentage');
+        $cart->addCoupon($coupon);
+
+        $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
+
+        $this->assertEquals(9.00, $cartItem->price());
+        $this->assertEquals(10.71, $cartItem->priceTax());
+        $this->assertEquals(18.00, $cartItem->subtotal());
+        $this->assertEquals(21.42, $cartItem->total());
+        $this->assertEquals(1.71, $cartItem->tax());
+        $this->assertEquals(3.42, $cartItem->taxTotal());
+        $this->assertEquals(2.38, $cartItem->lineDiscount());
+
+        $this->assertEquals(18.00, $cart->subtotal());
+        $this->assertEquals(21.42, $cart->total());
+        $this->assertEquals(3.42, $cart->tax());
+        $this->assertEquals(0.00, $cart->cartDiscount());
+    }
+
+    public function test_it_can_add_a_valid_value_coupon()
+    {
+        $this->setConfigFormat(2, '.', '');
+
+        $cart = $this->getCart();
+        $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cart->setTax('027c91341fd5cf4d2579b49c4b6a90da', 19);
+
+        $coupon = new CartCoupon('4.95Off', 4.95, 'value');
+        $cart->addCoupon($coupon);
+
+        $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
+
+        $this->assertEquals(10.00, $cartItem->price());
+        $this->assertEquals(11.90, $cartItem->priceTax());
+        $this->assertEquals(20.00, $cartItem->subtotal());
+        $this->assertEquals(23.80, $cartItem->total());
+        $this->assertEquals(1.90, $cartItem->tax());
+        $this->assertEquals(3.80, $cartItem->taxTotal());
+        $this->assertEquals(0.00, $cartItem->lineDiscount());
+
+        $this->assertEquals(20.00, $cart->subtotal());
+        $this->assertEquals(18.85, $cart->total());
+        $this->assertEquals(3.80, $cart->tax());
+        $this->assertEquals(4.95, $cart->cartDiscount());
+    }
+
+    public function test_it_can_add_a_valid_value_and_percentage_coupon()
+    {
+        config(['cart.coupon.allow_multiple' => true]);
+
+        $this->setConfigFormat(2, '.', '');
+
+        $cart = $this->getCart();
+        $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cart->setTax('027c91341fd5cf4d2579b49c4b6a90da', 19);
+
+        $coupon = new CartCoupon('4.95Off', 4.95, 'value');
+        $cart->addCoupon($coupon);
+
+        $coupon = new CartCoupon('10off', 0.1, 'percentage');
+        $cart->addCoupon($coupon);
+
+        $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
+
+        $this->assertEquals(9.00, $cartItem->price());
+        $this->assertEquals(10.71, $cartItem->priceTax());
+        $this->assertEquals(18.00, $cartItem->subtotal());
+        $this->assertEquals(21.42, $cartItem->total());
+        $this->assertEquals(1.71, $cartItem->tax());
+        $this->assertEquals(3.42, $cartItem->taxTotal());
+        $this->assertEquals(2.38, $cartItem->lineDiscount());
+
+        $this->assertEquals(18.00, $cart->subtotal());
+        $this->assertEquals(16.47, $cart->total());
+        $this->assertEquals(3.42, $cart->tax());
+        $this->assertEquals(4.95, $cart->cartDiscount());
+    }
+
+    public function test_allow_only_one_coupon_if_multiple_disabled_in_config_percentage()
+    {
+        config(['cart.coupon.allow_multiple' => false]);
+        $this->setConfigFormat(2, '.', '');
+
+        $cart = $this->getCart();
+        $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cart->setTax('027c91341fd5cf4d2579b49c4b6a90da', 19);
+
+        $coupon = new CartCoupon('20off', 0.2, 'percentage');
+        $cart->addCoupon($coupon);
+
+        $coupon = new CartCoupon('10off', 0.1, 'percentage');
+        $cart->addCoupon($coupon);
+
+        $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
+
+        $this->assertEquals(9.00, $cartItem->price());
+        $this->assertEquals(10.71, $cartItem->priceTax());
+        $this->assertEquals(18.00, $cartItem->subtotal());
+        $this->assertEquals(21.42, $cartItem->total());
+        $this->assertEquals(1.71, $cartItem->tax());
+        $this->assertEquals(3.42, $cartItem->taxTotal());
+        $this->assertEquals(2.38, $cartItem->lineDiscount());
+
+        $this->assertEquals(18.00, $cart->subtotal());
+        $this->assertEquals(21.42, $cart->total());
+        $this->assertEquals(3.42, $cart->tax());
+        $this->assertEquals(0.00, $cart->cartDiscount());
+    }
+
+    public function test_allow_only_one_coupon_if_multiple_disabled_in_config_value()
+    {
+        config(['cart.coupon.allow_multiple' => false]);
+        $this->setConfigFormat(2, '.', '');
+
+        $cart = $this->getCart();
+        $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cart->setTax('027c91341fd5cf4d2579b49c4b6a90da', 19);
+
+        $coupon = new CartCoupon('20off', 20, 'value');
+        $cart->addCoupon($coupon);
+
+        $coupon = new CartCoupon('4.95off', 4.95, 'value');
+        $cart->addCoupon($coupon);
+
+        $cartItem = $cart->get('027c91341fd5cf4d2579b49c4b6a90da');
+
+        $this->assertEquals(10.00, $cartItem->price());
+        $this->assertEquals(11.90, $cartItem->priceTax());
+        $this->assertEquals(20.00, $cartItem->subtotal());
+        $this->assertEquals(23.80, $cartItem->total());
+        $this->assertEquals(1.90, $cartItem->tax());
+        $this->assertEquals(3.80, $cartItem->taxTotal());
+        $this->assertEquals(0.00, $cartItem->lineDiscount());
+
+        $this->assertEquals(20.00, $cart->subtotal());
+        $this->assertEquals(18.85, $cart->total());
+        $this->assertEquals(3.80, $cart->tax());
+        $this->assertEquals(4.95, $cart->cartDiscount());
     }
 
     /**

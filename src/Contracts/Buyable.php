@@ -24,4 +24,11 @@ interface Buyable
      * @return float
      */
     public function getBuyablePrice($options = null);
+
+    /**
+     * Get the compare price of the Buyable item.
+     *
+     * @return float
+     */
+    public function getBuyableComparePrice($options = null);
 }
