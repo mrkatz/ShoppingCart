@@ -32,6 +32,7 @@ Look at one of the following topics to learn more about LaravelShoppingcart
 * [Instances](#instances)
 * [Models](#models)
 * [Database](#database)
+* [Coupons](#coupons)
 * [Exceptions](#exceptions)
 * [Events](#events)
 * [Example](#example)
@@ -410,6 +411,34 @@ If you want to retrieve the cart from the database and restore it, all you have 
     // To restore a cart instance named 'wishlist'
     Cart::instance('wishlist')->restore('username');
 ```
+## Coupons
+
+### Config Settings
+
+    /*
+    |--------------------------------------------------------------------------
+    | Coupon Settings
+    |--------------------------------------------------------------------------
+    |
+    | 
+    |
+    */
+    'coupon' => [
+        'allow_multiple' => false,
+    ],
+
+### Usage
+Two Types of Coupons can be added, (Percentage and Value). Examples of Adding:
+ ```php
+	$coupon = new CartCoupon('4.95Off', 4.95, 'value');
+    Cart::addCoupon($coupon);
+
+    $coupon = new CartCoupon('10off', 0.1, 'percentage');
+    Cart::addCoupon($coupon);
+
+```
+
+
 ## Exceptions
 
 The Cart package will throw exceptions if something goes wrong. This way it's easier to debug your code using the Cart package or to handle the error based on the type of exceptions. The Cart packages can throw the following exceptions:

@@ -4,6 +4,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Default instance
+    |--------------------------------------------------------------------------
+    |
+    | This default tax rate will be used when you make a class implement the
+    | Taxable interface and use the HasTax trait.
+    |
+    */
+
+    'instances' => [
+        'default' => 'default',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Default tax rate
     |--------------------------------------------------------------------------
     |
@@ -63,9 +77,35 @@ return [
     | 
     |
     */
-
     'coupon' => [
         'allow_multiple' => false,
+        'auto_coupons' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fee Settings
+    |--------------------------------------------------------------------------
+    |
+    | 
+    |
+    */
+    'fee' => [
+        'auto_fees' => [],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Compare Price Settings
+    |--------------------------------------------------------------------------
+    | Default Multiplier of Price if Custome Compare Price not set
+    | Discount: Automatic Line Discount From ComparePrice to Price
+    |
+    */
+    'compare_price' => [
+        'default_multiplier' => floatval('1.'. rand(20, 80)),
+        'discount' => false,
+        'discount_code' => 'hotdeal',
     ],
 
     /*

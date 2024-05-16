@@ -28,16 +28,34 @@ class BuyableProduct implements Buyable
     private $comparePrice;
 
     /**
+     * @var bool
+     */
+    private $taxable = true;
+
+    /**
+     * @var int
+     */
+    private $taxRate;
+
+    /**
      * BuyableProduct constructor.
      *
      * @param int|string $id
      * @param string     $name
      * @param float      $price
      */
-    public function __construct($id = 1, $name = 'Item name', $price = 10.00)
+    public function __construct($id = 1, $name = 'Item name', $price = 10.00, $taxable = true)
     {
         $this->id = $id;
         $this->name = $name;
+
+        if (is_int($taxable)) {
+            $this->taxable = true;
+            $this->taxRate = $taxable;
+        } else {
+            $this->taxable = $taxable;
+            $this->taxRate = config('cart.tax');
+        }
 
         if (is_array($price)) {
             $this->price = $price['price'];
@@ -50,42 +68,45 @@ class BuyableProduct implements Buyable
     }
 
     /**
-     * Get the identifier of the Buyable item.
+     * Get Buyable settings/options.
      *
-     * @return int|string
+     * @return array
      */
-    public function getBuyableIdentifier($options = null)
+    public function getBuyable($property = 'All')
     {
-        return $this->id;
+        $props = $this->getBuyableProps();
+
+        switch ($property) {
+            case 'All':
+            default:
+                return $property;
+            case 'id':
+            case 'name':
+            case 'price':
+            case 'comparePrice':
+            case 'taxable':
+            case 'taxRate':
+                return $props[$property];
+        }
     }
 
     /**
-     * Get the description or title of the Buyable item.
+     * Get Buyable properties.
      *
-     * @return string
+     * @return array|mixed
      */
-    public function getBuyableDescription($options = null)
+    public function getBuyableProps()
     {
-        return $this->name;
-    }
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'price' => $this->price,
+            'comparePrice' => $this->comparePrice,
 
-    /**
-     * Get the price of the Buyable item.
-     *
-     * @return float
-     */
-    public function getBuyablePrice($options = null)
-    {
-        return $this->price;
-    }
+            'taxable' => $this->taxable,
+            'taxRate' => $this->taxRate,
 
-    /**
-     * Get the price of the Buyable item.
-     *
-     * @return float
-     */
-    public function getBuyableComparePrice($options = null)
-    {
-        return $this->comparePrice;
+            'qty' => 1,
+        ];
     }
 }

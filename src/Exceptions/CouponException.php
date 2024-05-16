@@ -4,6 +4,4 @@ namespace Mrkatz\Shoppingcart\Exceptions;
 
 use RuntimeException;
 
-class CouponException extends RuntimeException
-{
-}
+class CouponException extends RuntimeException{}

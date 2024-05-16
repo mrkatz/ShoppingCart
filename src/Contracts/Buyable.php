@@ -5,30 +5,16 @@ namespace Mrkatz\Shoppingcart\Contracts;
 interface Buyable
 {
     /**
-     * Get the identifier of the Buyable item.
+     * Get Buyable settings/options.
      *
-     * @return int|string
+     * @return array|mixed
      */
-    public function getBuyableIdentifier($options = null);
+    public function getBuyable($property = 'All');
 
     /**
-     * Get the description or title of the Buyable item.
+     * Get Buyable properties.
      *
-     * @return string
+     * @return array|mixed
      */
-    public function getBuyableDescription($options = null);
-
-    /**
-     * Get the price of the Buyable item.
-     *
-     * @return float
-     */
-    public function getBuyablePrice($options = null);
-
-    /**
-     * Get the compare price of the Buyable item.
-     *
-     * @return float
-     */
-    public function getBuyableComparePrice($options = null);
+    public function getBuyableProps();
 }
