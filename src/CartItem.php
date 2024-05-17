@@ -8,6 +8,7 @@ use Illuminate\Contracts\Support\Jsonable;
 
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
+use Mrkatz\Shoppingcart\Exceptions\ConfigError;
 use Mrkatz\Shoppingcart\Facades\Cart;
 use Mrkatz\Shoppingcart\Traits\HasOptions;
 
@@ -50,11 +51,11 @@ class CartItem implements Arrayable, Jsonable
         if (config('cart.compare_price.discount', false)) {
 
             if (isset($price['comparePrice'])) {
-                $comparePrice = $price['comparePrice'];
-                $priceVal = $price['price'];
+                $comparePrice = $this->checkNumb($price['comparePrice']);
+                $priceVal = $this->checkNumb($price['price']);
             } else {
-                $comparePrice = $this->price * config('cart.compare_price.default_multiplier', 1.3);
-                $priceVal = $price;
+                $comparePrice = $this->checkNumb($price) * $this->comparePrice_multiplier();
+                $priceVal = $this->checkNumb($price);
             }
 
             $this->price = $comparePrice;
@@ -62,17 +63,17 @@ class CartItem implements Arrayable, Jsonable
         } else {
 
             if (is_array($price)) {
-                $this->price = $price['price'];
+                $this->price = $this->checkNumb($price['price']);
                 if (isset($price['comparePrice'])) {
-                    $this->comparePrice = $price['comparePrice'];
+                    $this->comparePrice = $this->checkNumb($price['comparePrice']);
                 } else {
-                    $this->comparePrice = $this->price * config('cart.compare_price.default_multiplier', 1.3);
+                    $this->comparePrice = $this->price * $this->comparePrice_multiplier();
                 }
             } elseif (strlen($price) < 0 || !is_numeric($price)) {
                 $this->throwError('Please supply a valid price.');
             } else {
-                $this->price    = floatval($price);
-                $this->comparePrice = $this->price * config('cart.compare_price.default_multiplier', 1.3);
+                $this->price    = $this->checkNumb($price);
+                $this->comparePrice = $this->price * $this->comparePrice_multiplier();
             }
         }
 
@@ -235,12 +236,19 @@ class CartItem implements Arrayable, Jsonable
         return json_encode($this->toArray(), $options);
     }
 
-    // public function setSaved($bool)
-    // {
-    //     $this->isSaved = $bool;
+    protected function checkNumb($value)
+    {
+        $num = (float) str_replace([',', '$'], '', $value);
+        return $num;
+    }
 
-    //     return $this;
-    // }
+    protected function comparePrice_multiplier()
+    {
+        $multiplier = config('cart.compare_price.default_multiplier', 1.3);
+        if (is_numeric($multiplier)) return $multiplier;
+
+        throw new ConfigError('Please Check ComparePrice Multiplier.');
+    }
 
     public function format($value, $decimals = null, $decimalPoint = null, $thousandSeperator = null)
     {

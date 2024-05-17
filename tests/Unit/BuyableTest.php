@@ -30,9 +30,9 @@ it('can resolve buyable values from configuration', function () {
     expect($product->getBuyable('id'))->toBe(1);
     expect($product->getBuyable('name'))->toBe('Item name');
     expect($product->getBuyable('price'))->toBe('$10.00');
-    expect($product->getBuyable('comparePrice'))->toBe('15.00'); // comparePrice is not set in the default constructor
+    expect($product->getBuyable('comparePrice'))->toBe('15.00');
     expect($product->getBuyable('taxable'))->toBe(true);
-    expect($product->getBuyable('taxRate'))->toBe(config('cart.tax')); // Use the default tax rate from configuration
+    expect($product->getBuyable('taxRate'))->toBe(config('cart.tax'));
 });
 
 it('expects Exception if config not setup', function () {

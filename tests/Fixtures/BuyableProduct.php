@@ -61,7 +61,11 @@ class BuyableProduct implements Buyable
 
         if (is_array($price)) {
             $this->price = $price['price'];
-            $this->comparePrice = $price['comparePrice'];
+            if (isset($price['comparePrice'])) {
+                $this->comparePrice = $price['comparePrice'];
+            } else {
+                // $this->comparePrice = $this->price * config('cart.compare_price.default_multiplier', 1.3);
+            }
         } elseif (strlen($price) < 0 || !is_numeric($price)) {
             throw new InvalidArgumentException('Please supply a valid price.');
         } else {

@@ -12,6 +12,7 @@ use InvalidArgumentException;
 use Mockery;
 // use Mrkatz\Shoppingcart\Cart;
 use Mrkatz\Shoppingcart\CartItem;
+use Mrkatz\Shoppingcart\Exceptions\ConfigError;
 use Mrkatz\Shoppingcart\Exceptions\InvalidRowIDException;
 use Mrkatz\Shoppingcart\Exceptions\UnknownModelException;
 use Mrkatz\Tests\Shoppingcart\TestCase;
@@ -19,11 +20,11 @@ use Mrkatz\Shoppingcart\Facades\Cart;
 use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
 use Mrkatz\Tests\Shoppingcart\Fixtures\ProductModel;
 use Mrkatz\Tests\Shoppingcart\Fixtures\TestUser;
+use SebastianBergmann\CodeCoverage\Report\Xml\Totals;
 
 class ShoppingCartTest extends TestCase
 {
-    /** @test */
-    public function it_can_add_an_item_to_the_cart()
+    public function test_it_can_add_an_item_to_the_cart()
     {
         Event::fake();
         $cartItem = Cart::add('item123', 'Sample Item', 1, 9.99);
@@ -33,6 +34,69 @@ class ShoppingCartTest extends TestCase
         $this->assertEquals(1, $cartItem->qty);
         $this->assertEquals(9.99, $cartItem->price);
         Event::assertDispatched('cart.added');
+    }
+
+    public function test_it_can_handle_price_as_string_and_seperator()
+    {
+        $this->setConfigFormat(2, '.', ',');
+        $cart = $this->getCart();
+
+        $cartItem =   $cart->add(new BuyableProduct(
+            1,
+            'Some title',
+            ['price' => number_format(1311.82, 2, '.', ','), 'comparePrice' => number_format(1311.82 * 1.3, 2, '.', ',')]
+        ), 1);
+        $cartItem->setTaxRate(10);
+
+        $this->assertEquals(131.18, $cartItem->tax());
+        $this->assertEquals('Some title', $cartItem->name);
+        $this->assertEquals(1, $cartItem->qty);
+        $this->assertEquals(1311.82, $cartItem->price(false));
+        $this->assertEquals(1705.37, $cartItem->comparePrice(false));
+        $this->assertEquals('1,311.82', $cartItem->price(true));
+        $this->assertEquals('1,705.37', $cartItem->comparePrice(true));
+        $this->assertEquals('1,443.00', $cart->total());
+        $this->assertEquals(1443.002, $cart->total(false));
+    }
+
+    public function test_it_can_handle_price_passed_in_as_array_without_compare_price()
+    {
+        config(['cart.compare_price.default_multiplier' => 1.5]);
+        $this->setConfigFormat(2, '.', ',');
+        $cart = $this->getCart();
+
+        $cartItem =   $cart->add(new BuyableProduct(1, 'Some title', ['price' => 1311.82]), 1);
+        $cartItem->setTaxRate(10);
+
+        $this->assertEquals(131.18, $cartItem->tax());
+        $this->assertEquals('Some title', $cartItem->name);
+        $this->assertEquals(1, $cartItem->qty);
+        $this->assertEquals(1311.82, $cartItem->price(false));
+        $this->assertEquals('1,311.82', $cartItem->price(true));
+        $this->assertEquals('1,967.73', $cartItem->comparePrice(true));
+        $this->assertEquals('1,443.00', $cart->total());
+        $this->assertEquals(1443.002, $cart->total(false));
+    }
+
+    public function test_handle_config_compare_price_default_multiplier_settings()
+    {
+        $this->expectException(ConfigError::class);
+        $this->expectExceptionMessage('Please Check ComparePrice Multiplier.');
+
+        config(['cart.compare_price.default_multiplier' => 'null']);
+        $cart = $this->getCart();
+
+        $cartItem =   $cart->add(new BuyableProduct(1, 'Some title', ['price' => 1311.82]), 1);
+        $cartItem->setTaxRate(10);
+
+        $this->assertEquals(131.18, $cartItem->tax());
+        $this->assertEquals('Some title', $cartItem->name);
+        $this->assertEquals(1, $cartItem->qty);
+        $this->assertEquals(1311.82, $cartItem->price(false));
+        $this->assertEquals('1,311.82', $cartItem->price(true));
+        $this->assertEquals('1,967.73', $cartItem->comparePrice(true));
+        $this->assertEquals('1,443.00', $cart->total());
+        $this->assertEquals(1443.002, $cart->total(false));
     }
 
     public function test_it_has_a_default_instance()
@@ -738,7 +802,7 @@ class ShoppingCartTest extends TestCase
     public function test_it_can_ignore_comparePrice_if_set_via_config()
     {
         $this->setConfigFormat(2, ',', '');
-        config(['cart.compare_price.default_multiplier' => null]);
+        config(['cart.compare_price.default_multiplier' => 0]);
         $cart = $this->getCart();
 
         $cartItem = $cart->add(new BuyableProduct(1, 'Some title', 2000.00), 2);

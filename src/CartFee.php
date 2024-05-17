@@ -27,7 +27,6 @@ class CartFee extends Collection
         $this->value = $value;
 
         $this->options = collect($options);
-        // $this->setOptions($options);
     }
 
     /**
