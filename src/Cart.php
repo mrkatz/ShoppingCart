@@ -428,6 +428,8 @@ class Cart
         $content->put($cartItem->rowId, $cartItem);
 
         $this->session->put($this->instance, $content);
+
+        return $this;
     }
 
     public function total($format = true, $options = ['discount' => true, 'fees' => true])

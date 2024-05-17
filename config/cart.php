@@ -71,6 +71,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Buyable Props
+    |--------------------------------------------------------------------------
+    |
+    | List of Props available in Buyable with References
+    | If surrounded by curly braces {} it will use value rather then search for property.
+    | If method call pass in as eg: price(). Attributes can be passed in as price(true,"$ ")
+    */
+
+    'buyable' => [
+        'model' => [
+            // BuyableProduct::class => [
+            //     'id' => 'id',
+            //     'name' => 'name',
+            //     'price' => 'price(false)',
+            //     'comparePrice' => 'comparePrice',
+
+            //     'taxable' => 'taxable',
+            //     'taxRate' => 'taxRate',
+            //     'qty' => '{1}',
+            // ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Coupon Settings
     |--------------------------------------------------------------------------
     |
@@ -103,7 +128,7 @@ return [
     |
     */
     'compare_price' => [
-        'default_multiplier' => floatval('1.'. rand(20, 80)),
+        'default_multiplier' => floatval('1.' . rand(20, 80)),
         'discount' => false,
         'discount_code' => 'hotdeal',
     ],

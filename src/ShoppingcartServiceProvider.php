@@ -21,7 +21,7 @@ class ShoppingcartServiceProvider extends ServiceProvider
         $this->mergeConfigFrom($config, 'cart');
         $this->publishes([__DIR__ . '/../config/cart.php' => config_path('cart.php')], 'config');
 
-        $this->migrations();
+        $this->registerMigrations();
     }
 
     public function boot()
@@ -29,8 +29,10 @@ class ShoppingcartServiceProvider extends ServiceProvider
         $this->registerEventListeners();
     }
 
-    protected function migrations()
+    protected function registerMigrations()
     {
+        $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
+
         $timestamp = date('Y_m_d_His', time());
         if (!class_exists('CreateShoppingcartTable')) {
             $this->publishes([

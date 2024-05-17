@@ -2,42 +2,49 @@
 
 namespace Mrkatz\Shoppingcart\Traits;
 
+use Mrkatz\Shoppingcart\Exceptions\BuyableException;
+
 trait CanBeBought
 {
-
-    /**
-     * Get the identifier of the Buyable item.
-     *
-     * @return int|string
-     */
-    public function getBuyableIdentifier($options = null)
+    public function getBuyable($property = 'All')
     {
-        return method_exists($this, 'getKey') ? $this->getKey() : $this->id;
+        if ($property === 'All') return $this->getBuyableProps();
+
+        $key = config('cart.buyable.model.' . self::class . '.' . $property);
+        if (is_null($key)) throw new BuyableException("Buyable $property not Set");
+
+        return $this->resolveBuyableValue($key);
     }
 
-    /**
-     * Get the description or title of the Buyable item.
-     *
-     * @return string
-     */
-    public function getBuyableDescription($options = null)
+    public function getBuyableProps()
     {
-        if(property_exists($this, 'name')) return $this->name;
-        if(property_exists($this, 'title')) return $this->title;
-        if(property_exists($this, 'description')) return $this->description;
-
-        return null;
+        $array = [];
+        foreach (config('cart.buyable.model.' . self::class) as $key => $value) {
+            $array[$key] = $this->resolveBuyableValue($value);
+        }
+        return $array;
     }
 
-    /**
-     * Get the price of the Buyable item.
-     *
-     * @return float
-     */
-    public function getBuyablePrice($options = null)
+    protected function resolveBuyableValue($string)
     {
-        if(property_exists($this, 'price')) return $this->price;
+        if (strpos($string, '(') !== false && strpos($string, ')') !== false) {
 
-        return null;
+            preg_match('/^([a-zA-Z0-9_]+)\((.*?)\)$/', $string, $matches);
+            $methodName  = $matches[1];
+            $arguments = explode(',', $matches[2]);
+
+            $trimmedArguments = array_map('trim', $arguments);
+
+            if (method_exists($this, $methodName)) {
+                return call_user_func_array([$this, $methodName], $trimmedArguments);
+            }
+            return $this->$methodName;
+        }
+
+        if (strpos($string, '{') === 0 && strpos($string, '}') === strlen($string) - 1) {
+            return substr($string, 1, -1);
+        }
+
+        return $this->$string;
     }
 }

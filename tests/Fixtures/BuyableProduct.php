@@ -4,9 +4,11 @@ namespace Mrkatz\Tests\Shoppingcart\Fixtures;
 
 use InvalidArgumentException;
 use Mrkatz\Shoppingcart\Contracts\Buyable;
+use Mrkatz\Shoppingcart\Traits\CanBeBought;
 
 class BuyableProduct implements Buyable
 {
+    use CanBeBought;
     /**
      * @var int|string
      */
@@ -66,47 +68,25 @@ class BuyableProduct implements Buyable
             $this->price = floatval($price);
         }
     }
-
-    /**
-     * Get Buyable settings/options.
-     *
-     * @return array
-     */
-    public function getBuyable($property = 'All')
+    public function price($format)
     {
-        $props = $this->getBuyableProps();
-
-        switch ($property) {
-            case 'All':
-            default:
-                return $property;
-            case 'id':
-            case 'name':
-            case 'price':
-            case 'comparePrice':
-            case 'taxable':
-            case 'taxRate':
-                return $props[$property];
-        }
+        return $this->price;
     }
 
-    /**
-     * Get Buyable properties.
-     *
-     * @return array|mixed
-     */
-    public function getBuyableProps()
+    public function prependprice($format = true, $prepend = null)
     {
-        return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'price' => $this->price,
-            'comparePrice' => $this->comparePrice,
+        $price = $format ? number_format($this->price, 2, '.', ',') : $this->price;
+        if (isset($prepend)) return $prepend . $price;
+        return $price;
+    }
 
-            'taxable' => $this->taxable,
-            'taxRate' => $this->taxRate,
+    public function taxable($format)
+    {
+        return $this->taxable;
+    }
 
-            'qty' => 1,
-        ];
+    public function comparePrice($format)
+    {
+        return $this->comparePrice;
     }
 }

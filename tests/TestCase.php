@@ -5,6 +5,7 @@ namespace Mrkatz\Tests\Shoppingcart;
 use Mrkatz\Shoppingcart\Cart;
 use Mrkatz\Shoppingcart\CartItem;
 use Mrkatz\Shoppingcart\ShoppingcartServiceProvider;
+use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
 use Orchestra\Testbench\TestCase as OrchestraTestCase;
 use PHPUnit\Framework\Assert;
 
@@ -43,6 +44,8 @@ abstract class TestCase extends OrchestraTestCase
         $this->app->afterResolving('migrator', function ($migrator) {
             $migrator->path(realpath(__DIR__ . '/../database/migrations'));
         });
+
+        $this->setBuyableConfig();
     }
 
     public function getCart()
@@ -58,6 +61,20 @@ abstract class TestCase extends OrchestraTestCase
         $this->app['config']->set('cart.format.decimals', $decimals);
         $this->app['config']->set('cart.format.decimal_point', $decimalPoint);
         $this->app['config']->set('cart.format.thousand_seperator', $thousandSeperator);
+    }
+
+    public function setBuyableConfig()
+    {
+        config([
+            'cart.buyable.model.' . BuyableProduct::class => [
+                'id' => 'id',
+                'name' => 'name',
+                'price' => 'price(true)',
+                'comparePrice' => 'comparePrice()',
+                'taxable' => 'taxable',
+                'taxRate' => 'taxRate',
+            ]
+        ]);
     }
 
     public function rowId(CartItem $cartItem)

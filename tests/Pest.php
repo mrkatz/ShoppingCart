@@ -1,4 +1,6 @@
 <?php
+use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -11,7 +13,9 @@
 |
 */
 
-// uses(Tests\TestCase::class)->in('Feature');
+
+
+uses(Mrkatz\Tests\Shoppingcart\TestCase::class)->in('Feature', 'Unit');
 
 /*
 |--------------------------------------------------------------------------
