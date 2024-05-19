@@ -90,6 +90,7 @@ return [
             //     'taxable' => 'taxable',
             //     'taxRate' => 'taxRate',
             //     'qty' => '{1}',
+            // 'auto_coupons' => 'coupons()'
             // ],
         ],
     ],
@@ -103,6 +104,7 @@ return [
     |
     */
     'coupon' => [
+        'enable' => true,
         'allow_multiple' => false,
         'auto_coupons' => [],
     ],
@@ -124,7 +126,7 @@ return [
     | Compare Price Settings
     |--------------------------------------------------------------------------
     | Default Multiplier of Price if Custome Compare Price not set
-    | Discount: Automatic Line Discount From ComparePrice to Price
+    | Discount: Automatic Line Coupon Discount From ComparePrice to Price
     |
     */
     'compare_price' => [

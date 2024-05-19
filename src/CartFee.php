@@ -29,11 +29,6 @@ class CartFee extends Collection
         $this->options = collect($options);
     }
 
-    /**
-     * Sets all the options for the fee.
-     *
-     * @param $options
-     */
     public function setOptions($options)
     {
         foreach ($options as $key => $value) {

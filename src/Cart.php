@@ -17,7 +17,7 @@ class Cart
     private $events;
     private $instance;
 
-    private $coupons = [];
+    public $coupons = [];
     protected $discount = 0.00;
     private $cartFees = [];
     protected $fee = 0.00;
@@ -63,13 +63,6 @@ class Cart
         return $content;
     }
 
-    public function count()
-    {
-        $content = $this->getContent();
-
-        return $content->sum('qty');
-    }
-
     public function add($id, $name = null, $qty = null, $price = null, array $options = [], $taxrate = null)
     {
         if ($this->isMulti($id)) {
@@ -83,6 +76,8 @@ class Cart
         } else {
             $cartItem = $this->createCartItem($id, $name, $qty, $price, $options, $taxrate);
         }
+
+        $cartItem->cart = $this->instance;
 
         $content = $this->getContent();
 
@@ -253,16 +248,9 @@ class Cart
     {
         $content = $this->getContent();
         foreach ($content as $cartItem) {
-            if (!config('cart.coupon.allow_multiple')) {
-                $cartItem->coupons = [];
-            }
+            $cartItem->coupons = [];
         }
         $this->coupons = [];
-    }
-
-    public function cartDiscount()
-    {
-        return $this->discount;
     }
 
     public function addFee(CartFee $fee)
@@ -319,7 +307,6 @@ class Cart
     public function store($identifier)
     {
         $content = $this->getContent();
-
 
         $this->getConnection()
             ->table($this->getTableName())
@@ -432,6 +419,24 @@ class Cart
         return $this;
     }
 
+    public function cartQty($rowId = null)
+    {
+        $content = $this->getContent();
+
+        $qty = $content->reduce(function ($qty, CartItem $cartItem) use ($rowId) {
+            if (is_null($rowId)) return $qty + $cartItem->qty;
+            if ($cartItem->rowId === $rowId) return $qty + $cartItem->qty;
+        }, 0);
+
+        return $qty;
+    }
+    public function count()
+    {
+        $content = $this->getContent();
+
+        return $content->sum('qty');
+    }
+
     public function total($format = true, $options = ['discount' => true, 'fees' => true])
     {
         $content = $this->getContent();
@@ -440,6 +445,7 @@ class Cart
             return $total + ($cartItem->qty * $cartItem->priceTax(false));
         }, 0);
 
+        // if ($options['discount'] && config('cart.coupon.enable')) $total -= $this->discount;
         if ($options['discount']) $total -= $this->discount;
         if ($options['fees']) $total += $this->fee;
 
@@ -469,5 +475,25 @@ class Cart
 
         if ($format) return $this->format($subTotal);
         return $subTotal;
+    }
+
+    public function cartDiscount($format = true)
+    {
+        if ($format) return $this->format($this->discount);
+        return $this->discount;
+    }
+
+    public function savings($format = true)
+    {
+        $content = $this->getContent();
+
+        $savings = $content->reduce(function ($savings, CartItem $cartItem) {
+            return $savings + $cartItem->lineDiscount();
+        }, 0);
+
+        $savings += $this->cartDiscount(false);
+
+        if ($format) return $this->format($savings);
+        return $savings;
     }
 }

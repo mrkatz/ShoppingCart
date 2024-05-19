@@ -16,7 +16,7 @@ class CartCoupon extends Collection
     public $appliedToCart = true;
 
     public $options = [];
-    public $status = false; //true
+    public $status = true; //false
     public $minimum_spend = null;
     public $maximum_spend = null;
     public $max_discount = null;
@@ -33,6 +33,7 @@ class CartCoupon extends Collection
     {
         if (!in_array($type, ['percentage', 'value'])) $this->throwError('Invalid Coupon Type. Type should be "percentage" or "value"');
         if ($type === 'percentage' && $value > 1) $this->throwError('Invalid value for a percentage coupon. The value must be between 0 and 1.');
+        if (!is_numeric($value)) $this->throwError('Invalid value for coupon. - ' . $value);
 
         $this->type = $type;
         $this->code = $code;
@@ -50,20 +51,53 @@ class CartCoupon extends Collection
 
     public function canApply(Cart $cart)
     {
-        // dd('can apply?');
-        // $this->message = 'Coupon Applied';
-
+        //Required QTY
+        if (!$this->satisfiesMinQty($cart->cartQty())) return $this->throwError("Minimum QTY of $this->min_qty not Reached");
         //status
-        //within Date
-        //Min/Max Spend
-        if ($cart->total(false) < $this->minimum_spend) return $this->throwError('Minimum Spend not Reached');
-        //Max Discount
+        if (!$this->isValid()) return $this->throwError('Coupon Not Valid');
+        //MinSpend
+        if (!$this->satisfiesMinSpend($cart->total(false))) return $this->throwError('Minimum Spend not Reached');
+
+        if (!$this->satisfiesStartDate()) return $this->throwError('Coupon Not Valid');
         //Use Expire
-        if (isset($this->end_date)) {
-            if (now()->gt($this->end_date)) return $this->throwError('Coupon Expired');
-        }
+        if (!$this->satisfiesEndDate()) return $this->throwError('Coupon Expired');
 
         return true;
+    }
+
+    public function isValid()
+    {
+        return $this->status;
+    }
+
+    public function hasMaxDiscount()
+    {
+        return isset($this->max_discount);
+    }
+
+    public function satisfiesMinSpend($total)
+    {
+        return is_null($this->minimum_spend) || $total >= $this->minimum_spend;
+    }
+
+    public function satisfiesMinQty($qty)
+    {
+        return is_null($this->min_qty) || $qty >= $this->min_qty;
+    }
+
+    public function satisfiesStartDate()
+    {
+        return is_null($this->start_date) || now()->gt($this->start_date);
+    }
+
+    public function satisfiesEndDate()
+    {
+        return is_null($this->end_date) || !now()->gt($this->end_date);
+    }
+
+    public function isPercentage()
+    {
+        return $this->type === 'percentage';
     }
 
     public function __get($option)

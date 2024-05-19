@@ -10,12 +10,11 @@ use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Mrkatz\Shoppingcart\Exceptions\ConfigError;
 use Mrkatz\Shoppingcart\Facades\Cart;
-use Mrkatz\Shoppingcart\Traits\HasOptions;
-
-use function PHPUnit\Framework\returnSelf;
 
 class CartItem implements Arrayable, Jsonable
 {
+    public $cart;
+
     public $rowId;
     private $associatedModel = null;
 
@@ -32,7 +31,8 @@ class CartItem implements Arrayable, Jsonable
     //taxTotal
     //Total
     public $coupons = [];
-    protected $discount = 0; //% Value UNit Total
+    protected $discount = 0;
+    protected $maxDiscount;
     public $fees = [];
 
     private $taxable = true;
@@ -94,6 +94,11 @@ class CartItem implements Arrayable, Jsonable
         }
     }
 
+    public function getCart()
+    {
+        return $this->cart;
+    }
+
     protected function updateOptions()
     {
         $splitFromOptions = [];
@@ -116,6 +121,8 @@ class CartItem implements Arrayable, Jsonable
     public function setTaxRate($taxRate)
     {
         $this->taxRate = $taxRate;
+        if ($taxRate === 0) $this->taxable = false;
+        if ($taxRate > 0) $this->taxable = true;
 
         return $this;
     }
@@ -129,9 +136,35 @@ class CartItem implements Arrayable, Jsonable
 
     protected function processCoupons($prop, $includeDiscount = true)
     {
-        if (!$includeDiscount || count($this->coupons) === 0) return $this->$prop;
-        // if ($prop === 'tax') dd($this->$prop);
+        if (!$includeDiscount || (count($this->coupons) === 0) || !config('cart.coupon.enable')) return $this->$prop;
+
+        $this->updateDiscount();
         return $this->$prop * (1 - $this->discount);
+    }
+
+    protected function updateDiscount()
+    {
+        $hasMaxDiscount = false;
+        $maxDiscount = null;
+        $this->discount = 0;
+
+        foreach ($this->coupons as $coupon) {
+            if ($coupon->type === 'percentage') {
+                $this->discount += $coupon->value;
+
+                if ($coupon->hasMaxDiscount()) {
+                    $maxDiscount = $coupon->max_discount;
+                    $hasMaxDiscount = true;
+                }
+            }
+        }
+
+        if ($hasMaxDiscount) {
+            $expectedDiscount = $this->total(false, false) * $this->discount;
+            if ($expectedDiscount > $maxDiscount) {
+                $this->discount = $maxDiscount / $this->total(false, false);
+            }
+        }
     }
 
     public function addCoupon(CartCoupon $coupon)
@@ -141,11 +174,29 @@ class CartItem implements Arrayable, Jsonable
         }
         $this->coupons[$coupon->code] = $coupon;
 
-        $this->discount = 0;
-        foreach ($this->coupons as $coupon) {
-            if ($coupon->type === 'percentage') {
-                $this->discount += $coupon->value;
-            }
+        $this->updateDiscount();
+    }
+
+    public function addCouponType($type = null, $options = [])
+    {
+        switch ($type) {
+            case 'comparePrice':
+                $discountVal = 1 - ($this->price(false, true) / $this->comparePrice(false));
+                $this->price = $this->comparePrice(false);
+                $coupon = new CartCoupon(config('cart.compare_price.discount_code', today()->format('M') . 'only'), $discountVal, 'percentage', ['validProducts' => [$this->rowId]]);
+                $this->addCoupon($coupon);
+                break;
+            case 'value':
+                $value = isset($options['value']) && is_numeric($options['value']) ? $options['value'] : null;
+                $code = isset($options['code']) ? $options['code'] : today()->format('M') . 'only' . $options['value'];
+
+                $coupon = new CartCoupon($code, $value, 'value', array_merge(['validProducts' => [$this->rowId]], $options));
+
+                Cart::instance($this->cart)->addCoupon($coupon);
+
+                break;
+            default:
+                return $this;
         }
     }
 
