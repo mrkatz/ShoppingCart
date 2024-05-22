@@ -324,6 +324,10 @@ class CartItem implements Arrayable, Jsonable
             return $this->priceTax(false, true);
         }
 
+        if ($attribute === 'comparePrice') {
+            return $this->comparePrice(false, false);
+        }
+
         if ($attribute === 'subtotal') {
             return $this->subtotal(false);
         }
@@ -359,8 +363,9 @@ class CartItem implements Arrayable, Jsonable
 
     public function comparePrice($format = true)
     {
-        if ($format) return $this->format($this->comparePrice);
-        return $this->comparePrice;
+        $comparePrice = $this->comparePrice > 0 ? $this->comparePrice : $this->price(false, false);
+        if ($format) return $this->format($comparePrice);
+        return $comparePrice;
     }
 
     public function unitPrice($format = true)

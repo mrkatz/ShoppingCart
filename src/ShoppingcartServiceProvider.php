@@ -33,22 +33,9 @@ class ShoppingcartServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
 
-        $timestamp = date('Y_m_d_His', time());
-        if (!class_exists('CreateShoppingcartTable')) {
-            $this->publishes([
-                __DIR__ . '/../database/migrations/0000_00_00_000000_create_shoppingcart_table.php' => database_path('migrations/' . $timestamp . '_create_shoppingcart_table.php'),
-            ], 'migrations');
-        }
-        if (!class_exists('CreateCouponsTable')) {
-            $this->publishes([
-                __DIR__ . '/../database/migrations/0000_00_00_000000_create_coupons_table.php' => database_path('migrations/' . $timestamp . '_create_coupons_table.php'),
-            ], 'migrations');
-        }
-        if (!class_exists('CreateCartFeesTable')) {
-            $this->publishes([
-                __DIR__ . '/../database/migrations/0000_00_00_000000_create_cartfees_table.php' => database_path('migrations/' . $timestamp . '_create_cartfees_table.php'),
-            ], 'migrations');
-        }
+        $this->publishes([
+            '/database/migrations' => database_path('migrations/'),
+        ], 'migrations');
     }
 
     protected function registerEventListeners()

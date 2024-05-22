@@ -445,7 +445,6 @@ class Cart
             return $total + ($cartItem->qty * $cartItem->priceTax(false));
         }, 0);
 
-        // if ($options['discount'] && config('cart.coupon.enable')) $total -= $this->discount;
         if ($options['discount']) $total -= $this->discount;
         if ($options['fees']) $total += $this->fee;
 
@@ -495,5 +494,17 @@ class Cart
 
         if ($format) return $this->format($savings);
         return $savings;
+    }
+
+    public function comparePrice($format = true)
+    {
+        $content = $this->getContent();
+
+        $compare = $content->reduce(function ($compare, CartItem $cartItem) {
+            return $compare + ($cartItem->qty * $cartItem->comparePrice(false));
+        }, 0);
+
+        if ($format) return $this->format($compare);
+        return $compare;
     }
 }

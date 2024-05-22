@@ -20,7 +20,6 @@ use Mrkatz\Shoppingcart\Facades\Cart;
 use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
 use Mrkatz\Tests\Shoppingcart\Fixtures\ProductModel;
 use Mrkatz\Tests\Shoppingcart\Fixtures\TestUser;
-use SebastianBergmann\CodeCoverage\Report\Xml\Totals;
 
 class ShoppingCartTest extends TestCase
 {
@@ -799,7 +798,24 @@ class ShoppingCartTest extends TestCase
         $this->assertEquals('2600.00', $cartItem->comparePrice);
     }
 
-    public function test_it_can_ignore_comparePrice_if_set_via_config()
+    public function test_it_can_get_compare_price_for_entire_cart()
+    {
+        $this->setConfigFormat(2, ',', '');
+        config(['cart.compare_price.default_multiplier' => 1.3]);
+        $cart = $this->getCart();
+
+        $cartItem = $cart->add(new BuyableProduct(1, 'Some title', 2000.00), 2);
+
+        $this->assertEquals('4000,00', $cart->subtotal());
+        $this->assertEquals('4000.00', $cart->subtotal);
+
+        $this->assertEquals('2600,00', $cartItem->comparePrice());
+        $this->assertEquals('2600.00', $cartItem->comparePrice);
+
+        $this->assertEquals('5200,00', $cart->comparePrice());
+    }
+
+    public function test_it_will_grab_price_without_discount_as_comparePrice_if_not_set()
     {
         $this->setConfigFormat(2, ',', '');
         config(['cart.compare_price.default_multiplier' => 0]);
@@ -810,7 +826,7 @@ class ShoppingCartTest extends TestCase
         $this->assertEquals('4000,00', $cart->subtotal());
         $this->assertEquals('4000.00', $cart->subtotal);
 
-        $this->assertEquals('0,00', $cartItem->comparePrice());
+        $this->assertEquals('2000,00', $cartItem->comparePrice());
         $this->assertEquals(null, $cartItem->comparePrice);
     }
 

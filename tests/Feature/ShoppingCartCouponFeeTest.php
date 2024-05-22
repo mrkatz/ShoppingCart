@@ -2,7 +2,6 @@
 
 namespace Mrkatz\Tests\Shoppingcart\Feature;
 
-use Illuminate\Mail\Mailables\Content;
 use Mrkatz\Shoppingcart\CartCoupon;
 use Mrkatz\Shoppingcart\CartFee;
 use Mrkatz\Shoppingcart\Exceptions\CouponException;
