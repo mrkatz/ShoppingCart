@@ -97,7 +97,6 @@ class CartCoupon extends Collection
 
     public function satisfiesProductRestriction($rowId = null)
     {
-        // dd(count($this->validProducts) === 0||());
         return count($this->validProducts) === 0 || (!is_null($rowId) && in_array($rowId, $this->validProducts));
     }
 

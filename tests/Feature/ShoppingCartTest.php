@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use InvalidArgumentException;
 use Mockery;
-use Mrkatz\Shoppingcart\CartCoupon;
 use Mrkatz\Shoppingcart\CartFee;
-// use Mrkatz\Shoppingcart\Cart;
 use Mrkatz\Shoppingcart\CartItem;
 use Mrkatz\Shoppingcart\Exceptions\ConfigError;
 use Mrkatz\Shoppingcart\Exceptions\InvalidRowIDException;
@@ -141,7 +139,6 @@ class ShoppingCartTest extends TestCase
         // $fee = new CartFee('merchant10', 0.1);
         // $cart->instance('products')->addFee($fee);
 
-        // dd($cart->instance('products')->total());
         $this->assertEquals('30.25', Cart::instance('services')->total());
         $this->assertEquals('36.30', Cart::instance('products')->total());
         $this->assertEquals('66.55', $cart->withInstance(['services', 'products'], 'total'));

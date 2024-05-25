@@ -12,8 +12,8 @@ class ShoppingcartServiceProvider extends ServiceProvider
 {
     public function register()
     {
-        $this->app->singleton(Cart::class, function ($app) {
-            return new Cart($app['session'], $app['events']);
+        $this->app->singleton(Cart::class, function () {
+            return new Cart();
         });
         $this->app->alias(Cart::class, 'cart');
 

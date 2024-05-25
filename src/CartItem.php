@@ -5,11 +5,9 @@ namespace Mrkatz\Shoppingcart;
 use Illuminate\Contracts\Support\Arrayable;
 use Mrkatz\Shoppingcart\Contracts\Buyable;
 use Illuminate\Contracts\Support\Jsonable;
-
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
 use Mrkatz\Shoppingcart\Exceptions\ConfigError;
-use Mrkatz\Shoppingcart\Facades\Cart;
 
 class CartItem implements Arrayable, Jsonable
 {
@@ -186,29 +184,6 @@ class CartItem implements Arrayable, Jsonable
 
         $this->updateDiscount();
     }
-
-    // public function addCouponType($type = null, $options = [])
-    // {
-    //     switch ($type) {
-    //         case 'comparePrice':
-    //             $discountVal = 1 - ($this->price(false, true) / $this->comparePrice(false));
-    //             $this->price = $this->comparePrice(false);
-    //             $coupon = new CartCoupon(config('cart.compare_price.discount_code', today()->format('M') . 'only'), $discountVal, 'percentage', ['validProducts' => [$this->rowId]]);
-    //             $this->addCoupon($coupon);
-    //             break;
-    //         case 'value':
-    //             $value = isset($options['value']) && is_numeric($options['value']) ? $options['value'] : null;
-    //             $code = isset($options['code']) ? $options['code'] : today()->format('M') . 'only' . $options['value'];
-
-    //             $coupon = new CartCoupon($code, $value, 'value', array_merge(['validProducts' => [$this->rowId]], $options));
-
-    //             Cart::instance($this->cart)->addCoupon($coupon);
-
-    //             break;
-    //         default:
-    //             return $this;
-    //     }
-    // }
 
     public static function fromBuyable(Buyable $item)
     {

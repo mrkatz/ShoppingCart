@@ -25,10 +25,10 @@ class Cart
     private $cartFees = [];
     protected $fee = 0.00;
 
-    public function __construct(SessionManager $session, Dispatcher $events)
+    public function __construct()
     {
-        $this->session = $session;
-        $this->events = $events;
+        $this->session = app()->make(SessionManager::class);
+        $this->events = app('events');
 
         $this->instance(config('cart.instances.default', 'default'));
         $this->cartFees = [];
@@ -488,7 +488,6 @@ class Cart
 
         $content->put($cartItem->rowId, $cartItem);
 
-        // $this->session->put($this->instance, $content);
         $this->storeContent($content);
 
         return $this;
@@ -594,15 +593,7 @@ class Cart
             fn ($instance) => $this->instance($instance)->$value(false, $value === 'total' ? $options : null),
             $instances
         ));
-        // $sum = 0.0;
-        // foreach ($instances as $instance) {
-        //     $cartInstance = $this->instance($instance);
-        //     if ($value === 'total') {
-        //         $sum += $cartInstance->$value(false, $options);
-        //     } else {
-        //         $sum += $cartInstance->$value(false);
-        //     }
-        // }
+
         return $format ? $this->format($sum) : $sum;
     }
 }

@@ -50,10 +50,7 @@ abstract class TestCase extends OrchestraTestCase
 
     public function getCart()
     {
-        $session = $this->app->make('session');
-        $events = $this->app->make('events');
-
-        return new Cart($session, $events);
+        return new Cart();
     }
 
     public function setConfigFormat($decimals, $decimalPoint, $thousandSeperator, $prepend = '')
