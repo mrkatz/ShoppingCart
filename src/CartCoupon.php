@@ -31,9 +31,9 @@ class CartCoupon extends Collection
 
     public function __construct($code, $value, $type = 'percentage', $options = [])
     {
-        if (!in_array($type, ['percentage', 'value'])) $this->throwError('Invalid Coupon Type. Type should be "percentage" or "value"');
+        if (!in_array($type, ['percentage', 'value', 'comparePrice'])) $this->throwError('Invalid Coupon Type. Type should be "percentage" or "value"');
         if ($type === 'percentage' && $value > 1) $this->throwError('Invalid value for a percentage coupon. The value must be between 0 and 1.');
-        if (!is_numeric($value)) $this->throwError('Invalid value for coupon. - ' . $value);
+        if (!is_numeric($value) && !($type === 'comparePrice')) $this->throwError('Invalid value for coupon. - ' . $value);
 
         $this->type = $type;
         $this->code = $code;
@@ -93,6 +93,12 @@ class CartCoupon extends Collection
     public function satisfiesEndDate()
     {
         return is_null($this->end_date) || !now()->gt($this->end_date);
+    }
+
+    public function satisfiesProductRestriction($rowId = null)
+    {
+        // dd(count($this->validProducts) === 0||());
+        return count($this->validProducts) === 0 || (!is_null($rowId) && in_array($rowId, $this->validProducts));
     }
 
     public function isPercentage()

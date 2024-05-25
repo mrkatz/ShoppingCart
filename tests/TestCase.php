@@ -56,11 +56,12 @@ abstract class TestCase extends OrchestraTestCase
         return new Cart($session, $events);
     }
 
-    public function setConfigFormat($decimals, $decimalPoint, $thousandSeperator)
+    public function setConfigFormat($decimals, $decimalPoint, $thousandSeperator, $prepend = '')
     {
         $this->app['config']->set('cart.format.decimals', $decimals);
         $this->app['config']->set('cart.format.decimal_point', $decimalPoint);
         $this->app['config']->set('cart.format.thousand_seperator', $thousandSeperator);
+        $this->app['config']->set('cart.format.prepend', $prepend);
     }
 
     public function setBuyableConfig()

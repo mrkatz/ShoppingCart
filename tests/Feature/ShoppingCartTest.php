@@ -10,11 +10,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use InvalidArgumentException;
 use Mockery;
+use Mrkatz\Shoppingcart\CartCoupon;
+use Mrkatz\Shoppingcart\CartFee;
 // use Mrkatz\Shoppingcart\Cart;
 use Mrkatz\Shoppingcart\CartItem;
 use Mrkatz\Shoppingcart\Exceptions\ConfigError;
 use Mrkatz\Shoppingcart\Exceptions\InvalidRowIDException;
 use Mrkatz\Shoppingcart\Exceptions\UnknownModelException;
+use Mrkatz\Shoppingcart\Exceptions\UnknownPropertyException;
 use Mrkatz\Tests\Shoppingcart\TestCase;
 use Mrkatz\Shoppingcart\Facades\Cart;
 use Mrkatz\Tests\Shoppingcart\Fixtures\BuyableProduct;
@@ -123,6 +126,47 @@ class ShoppingCartTest extends TestCase
 
         $this->assertItemsInCart(1, $cart->instance(config('cart.instances.default', 'default')));
         $this->assertItemsInCart(1, $cart->instance('wishlist'));
+    }
+
+    public function test_it_can_retreave_combined_cart_values_with_multiple_instances()
+    {
+        $cart = $this->getCart();
+        config(['cart.compare_price.default_multiplier' => 1.3]);
+        config(['cart.format.on_zero' => '--']);
+
+        $cartItem1 = $cart->instance('services')->add(new BuyableProduct(1, 'First item', 25));
+        // $cartItem1->addCoupon(new CartCoupon('discount10', '0.1'));
+        $cart->instance('products')->add(new BuyableProduct(2, 'Second item', 30));
+
+        // $fee = new CartFee('merchant10', 0.1);
+        // $cart->instance('products')->addFee($fee);
+
+        // dd($cart->instance('products')->total());
+        $this->assertEquals('30.25', Cart::instance('services')->total());
+        $this->assertEquals('36.30', Cart::instance('products')->total());
+        $this->assertEquals('66.55', $cart->withInstance(['services', 'products'], 'total'));
+        $this->assertEquals('55.00', $cart->withInstance(['services', 'products'], 'subtotal'));
+        $this->assertEquals('11.55', $cart->withInstance(['services', 'products'], 'tax'));
+        $this->assertEquals(2, $cart->withInstance(['services', 'products'], 'count'));
+        $this->assertEquals('--', $cart->withInstance(['services', 'products'], 'cartDiscount'));
+        $this->assertEquals('--', $cart->withInstance(['services', 'products'], 'savings'));
+        $this->assertEquals('--', $cart->withInstance(['services', 'products'], 'cartFees'));
+        $this->assertEquals(71.50, $cart->withInstance(['services', 'products'], 'comparePrice'));
+    }
+
+    public function test_it_will_throw_exception_withInvalid_property_using_multiple_instances()
+    {
+        $this->expectException(UnknownPropertyException::class);
+        $this->expectExceptionMessage('invalid is not a valid property on Multi-instance method');
+        $cart = $this->getCart();
+
+        $cart->instance('services')->add(new BuyableProduct(1, 'First item', 25));
+        $cart->instance('products')->add(new BuyableProduct(2, 'Second item', 30));
+
+        $this->assertEquals('30.25', Cart::instance('services')->total());
+        $this->assertEquals('36.30', Cart::instance('products')->total());
+        $this->assertEquals('66.55', $cart->withInstance(['services', 'products'], 'total'));
+        $this->assertEquals('55.00', $cart->withInstance(['services', 'products'], 'invalid'));
     }
 
     public function test_it_will_return_the_cartitem_of_the_added_item()
@@ -762,10 +806,39 @@ class ShoppingCartTest extends TestCase
         $this->setConfigFormat(2, ',', '');
         $cart = $this->getCart();
 
-        $cart->add(new BuyableProduct(1, 'Some title', 1000.00), 1);
+        $cartItem = $cart->add(new BuyableProduct(1, 'Some title', 1000.00), 1);
         $cart->add(new BuyableProduct(2, 'Some title', 2000.00), 2);
 
         $this->assertEquals('5000,00', $cart->subtotal(true));
+    }
+
+    public function test_it_can_return_formated_values_with_prepended_symbol()
+    {
+        $this->setConfigFormat(2, ',', '', '$');
+        $cart = $this->getCart();
+
+        $cartItem = $cart->add(new BuyableProduct(1, 'Some title', 1000.00), 1);
+        $cartItem->setTaxRate(19);
+        $cartItem2 = $cart->add(new BuyableProduct(2, 'Some title', 2000.00), 2);
+        $cartItem2->setTaxRate(19);
+
+        $this->assertEquals('$5000,00', $cart->subtotal(true));
+        $this->assertEquals('$950,00', $cart->tax(true));
+        $this->assertEquals('$5950,00', $cart->total(true));
+        $this->assertEquals('$1000,00', $cartItem->price(true));
+        $this->assertEquals('$1190,00', $cartItem->priceTax(true));
+    }
+
+    public function test_it_can_return_formated_values_when_value_is_zero()
+    {
+        $this->setConfigFormat(2, ',', '', '$');
+        config(['cart.format.on_zero' => '--']);
+        $cart = $this->getCart();
+
+        $this->assertEquals('--', $cart->subtotal(true));
+        $this->assertEquals('--', $cart->tax(true));
+        $this->assertEquals('--', $cart->total(true));
+        $this->assertEquals('--', $cart->savings(true));
     }
 
     public function test_it_can_set_and_retreave_comparePrice()
@@ -878,7 +951,7 @@ class ShoppingCartTest extends TestCase
 
         $cart->store($identifier = 123);
 
-        $serialized = serialize($cart->content());
+        $serialized = serialize($cart->databaseStoreBlock());
 
         $this->assertDatabaseHas('shoppingcart', ['identifier' => $identifier, 'instance' => 'default', 'content' => $serialized]);
 
@@ -901,7 +974,7 @@ class ShoppingCartTest extends TestCase
 
             $cart->store($identifier . $cartName);
 
-            $instances[$cartName] = serialize($cart->content());
+            $instances[$cartName] = serialize($cart->databaseStoreBlock());
 
             Event::assertDispatched('cart.stored');
         }
@@ -934,7 +1007,7 @@ class ShoppingCartTest extends TestCase
 
             $cart->add(new BuyableProduct);
 
-            $instances[$cartName] = serialize($cart->content());
+            $instances[$cartName] = serialize($cart->databaseStoreBlock());
         }
 
         Auth::logout();
@@ -963,7 +1036,7 @@ class ShoppingCartTest extends TestCase
 
         $cart->store($identifier = 123);
 
-        $serialized = serialize($cart->content());
+        $serialized = serialize($cart->databaseStoreBlock());
 
         $this->assertDatabaseHas('shoppingcart', ['identifier' => $identifier, 'instance' => 'default', 'content' => $serialized]);
 
@@ -993,6 +1066,62 @@ class ShoppingCartTest extends TestCase
         $this->assertItemsInCart(1, $cart);
 
         Event::assertDispatched('cart.restored');
+    }
+
+    public function test_it_can_store_content_and_cartFees_coupons_in_database()
+    {
+        config(['cart.database.store' => ['coupon' => true, 'fees' => true]]);
+        $this->artisan('migrate', [
+            '--database' => 'testing',
+        ]);
+
+        Event::fake();
+
+        $cart = $this->getCart();
+
+        $cart->add(new BuyableProduct);
+        $cart->addCouponType('value', ['value' => 1]);
+
+        $cart->addFee(new CartFee('testFee', 0.1));
+
+        $this->assertEquals(11.10, Cart::total());
+
+        $cartData = $cart->databaseStoreBlock();
+        $cart->store($identifier = 123);
+
+        $serialized = serialize($cartData);
+
+        $this->assertDatabaseHas('shoppingcart', ['identifier' => $identifier, 'instance' => 'default', 'content' => $serialized]);
+
+        Event::assertDispatched('cart.stored');
+    }
+
+    public function test_it_can_store_content_and_exclude_coupons_in_database()
+    {
+        config(['cart.database.store' => ['coupon' => false, 'fees' => true]]);
+        $this->artisan('migrate', [
+            '--database' => 'testing',
+        ]);
+
+        Event::fake();
+
+        $cart = $this->getCart();
+
+        $cart->add(new BuyableProduct);
+        $cart->addCouponType('value', ['value' => 1]);
+
+        $cart->addFee(new CartFee('testFee', 0.1));
+
+        $this->assertEquals(11.10, Cart::total());
+
+        $cartData = $cart->databaseStoreBlock();
+        $cart->store($identifier = 123);
+
+        $serialized = serialize($cartData);
+
+        $this->assertDatabaseHas('shoppingcart', ['identifier' => $identifier, 'instance' => 'default', 'content' => $serialized]);
+
+        Event::assertDispatched('cart.stored');
     }
 
     public function test_it_will_just_keep_the_current_instance_if_no_cart_with_the_given_identifier_was_stored()

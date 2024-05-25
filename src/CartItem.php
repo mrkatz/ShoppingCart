@@ -172,33 +172,43 @@ class CartItem implements Arrayable, Jsonable
         if (!config('cart.coupon.allow_multiple')) {
             $this->coupons = [];
         }
-        $this->coupons[$coupon->code] = $coupon;
+
+        if ($coupon->satisfiesProductRestriction($this->rowId)) {
+            if ($coupon->type === 'comparePrice' && $this->comparePrice(false) > $this->price(false)) {
+                $price = $this->price(false);
+                $comparePrice = $this->comparePrice(false);
+                $discountVal = 1 - ($price / $comparePrice);
+                $this->price = $comparePrice;
+                $coupon = new CartCoupon($coupon->code, $discountVal, 'percentage', ['validProducts' => [$this->rowId]]);
+            }
+            $this->coupons[$coupon->code] = $coupon;
+        }
 
         $this->updateDiscount();
     }
 
-    public function addCouponType($type = null, $options = [])
-    {
-        switch ($type) {
-            case 'comparePrice':
-                $discountVal = 1 - ($this->price(false, true) / $this->comparePrice(false));
-                $this->price = $this->comparePrice(false);
-                $coupon = new CartCoupon(config('cart.compare_price.discount_code', today()->format('M') . 'only'), $discountVal, 'percentage', ['validProducts' => [$this->rowId]]);
-                $this->addCoupon($coupon);
-                break;
-            case 'value':
-                $value = isset($options['value']) && is_numeric($options['value']) ? $options['value'] : null;
-                $code = isset($options['code']) ? $options['code'] : today()->format('M') . 'only' . $options['value'];
+    // public function addCouponType($type = null, $options = [])
+    // {
+    //     switch ($type) {
+    //         case 'comparePrice':
+    //             $discountVal = 1 - ($this->price(false, true) / $this->comparePrice(false));
+    //             $this->price = $this->comparePrice(false);
+    //             $coupon = new CartCoupon(config('cart.compare_price.discount_code', today()->format('M') . 'only'), $discountVal, 'percentage', ['validProducts' => [$this->rowId]]);
+    //             $this->addCoupon($coupon);
+    //             break;
+    //         case 'value':
+    //             $value = isset($options['value']) && is_numeric($options['value']) ? $options['value'] : null;
+    //             $code = isset($options['code']) ? $options['code'] : today()->format('M') . 'only' . $options['value'];
 
-                $coupon = new CartCoupon($code, $value, 'value', array_merge(['validProducts' => [$this->rowId]], $options));
+    //             $coupon = new CartCoupon($code, $value, 'value', array_merge(['validProducts' => [$this->rowId]], $options));
 
-                Cart::instance($this->cart)->addCoupon($coupon);
+    //             Cart::instance($this->cart)->addCoupon($coupon);
 
-                break;
-            default:
-                return $this;
-        }
-    }
+    //             break;
+    //         default:
+    //             return $this;
+    //     }
+    // }
 
     public static function fromBuyable(Buyable $item)
     {
@@ -305,13 +315,17 @@ class CartItem implements Arrayable, Jsonable
     {
         $value = is_string($value) ? $this->$value : $value;
 
+        if (floatval($value) === 0.0) return config('cart.format.on_zero', 0);
+
         if (is_null($decimals)) $decimals = config('cart.format.decimals', 2);
 
         if (is_null($decimalPoint)) $decimalPoint = config('cart.format.decimal_point', '.');
 
         if (is_null($thousandSeperator)) $thousandSeperator = config('cart.format.thousand_seperator', ',');
 
-        return number_format($value, $decimals, $decimalPoint, $thousandSeperator);
+        $prepend = config('cart.format.prepend', '');
+
+        return $prepend . number_format($value, $decimals, $decimalPoint, $thousandSeperator);
     }
 
     public function __get($attribute)

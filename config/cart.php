@@ -50,6 +50,10 @@ return [
 
         'save_on_logout' => false,
 
+        'store' => [
+            'coupon' => true,
+            'fees' => true
+        ],
         'save_instances' => [
             'default',
             // 'wishlist',
@@ -146,6 +150,10 @@ return [
     */
 
     'format' => [
+
+        'on_zero' => 0.0,
+
+        'prepend' => '',
 
         'decimals' => 2,
 

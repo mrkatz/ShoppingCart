@@ -11,7 +11,7 @@ use Mrkatz\Tests\Shoppingcart\TestCase;
 
 class ShoppingCartCouponFeeTest extends TestCase
 {
-    public function test_it_can_dissable_coupons_via_config()
+    public function test_disable_coupons_via_config()
     {
         $this->setConfigFormat(2, '.', '');
 
@@ -61,7 +61,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(0.00, $cart->savings());
     }
 
-    public function test_it_can_add_a_valid_percentage_coupon()
+    public function test_add_valid_percentage_coupon()
     {
         $this->setConfigFormat(2, '.', '');
 
@@ -88,7 +88,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(2.38, $cart->savings());
     }
 
-    public function test_it_will_discount_comparePrice_to_price_with_coupon()
+    public function test_discount_compare_price_to_price_with_coupon()
     {
         $this->setConfigFormat(2, '.', '');
         config(['cart.compare_price.discount' => true]);
@@ -125,7 +125,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(24.99, $cart->savings());
     }
 
-    public function test_it_can_discount_comparePrice_to_price_with_coupon_per_item()
+    public function test_discount_compare_price_to_price_with_coupon_per_item()
     {
         $this->setConfigFormat(2, '.', '');
         config(['cart.compare_price.discount' => false]);
@@ -133,7 +133,8 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cart = $this->getCart();
         $cartItem = $cart->add(new BuyableProduct(1, 'First item', ['price' => 10.00, 'comparePrice' => 20.00]), 2);
         $cartItem->setTaxRate(19);
-        $cartItem->addCouponType('comparePrice');
+
+        $cart->addCouponType('comparePrice', ['validProducts' => [$cartItem->rowId]]);
 
         $cartItem2 = $cart->add(new BuyableProduct(1, 'First item', ['price' => 20.00, 'comparePrice' => 30.00]), 1);
         $cartItem2->setTaxRate(19);
@@ -163,7 +164,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(23.80, $cart->savings());
     }
 
-    public function test_it_will_validate_the_coupon_against_option_minimum_spend()
+    public function test_coupon_minimum_spend_validation()
     {
         $this->expectException(CouponException::class);
         $this->expectExceptionMessage('Minimum Spend not Reached');
@@ -176,7 +177,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cart->addCoupon($coupon);
     }
 
-    public function test_it_will_validate_the_coupon_against_option_expired()
+    public function test_coupon_expiration_validation()
     {
         $this->expectException(CouponException::class);
         $this->expectExceptionMessage('Coupon Expired');
@@ -189,7 +190,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cart->addCoupon($coupon);
     }
 
-    public function test_it_will_validate_the_coupon_against_option_start_date()
+    public function test_coupon_start_date_validation()
     {
         $this->expectException(CouponException::class);
         $this->expectExceptionMessage('Coupon Not Valid');
@@ -202,7 +203,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cart->addCoupon($coupon);
     }
 
-    public function test_it_will_validate_the_coupon_against_option_qty_required()
+    public function test_coupon_minimum_quantity_validation()
     {
         $this->expectException(CouponException::class);
         $this->expectExceptionMessage("Minimum QTY of 4 not Reached");
@@ -215,7 +216,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cart->addCoupon($coupon);
     }
 
-    public function test_it_will_validate_the_coupon_against_option_qty_required_happy()
+    public function test_coupon_minimum_quantity_validation_success()
     {
         $cart = $this->getCart();
         $cartItem = $cart->add(new BuyableProduct(1, 'First item', 10.00), 4);
@@ -230,7 +231,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals('36.00', $cartItem->subtotal());
     }
 
-    public function test_it_will_limit_the_coupon_against_option_max_discount()
+    public function test_coupon_maximum_discount_limit()
     {
         $cartItem = Cart::add(new BuyableProduct(1, 'First item', 100.00), 1);
         $cartItem->setTaxRate(0);
@@ -246,12 +247,12 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(10.00, Cart::savings());
     }
 
-    public function test_it_can_add_a_valid_value_coupon()
+    public function test_add_valid_value_coupon()
     {
         $this->setConfigFormat(2, '.', '');
 
         $cart = $this->getCart();
-        $cartItem = $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cartItem = $cart->instance('hello')->add(new BuyableProduct(1, 'First item', 10.00), 2);
         $cartItem->setTaxRate(19);
 
         $coupon = new CartCoupon('4.95Off', 4.95, 'value');
@@ -270,15 +271,20 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(3.80, $cart->tax());
         $this->assertEquals(4.95, $cart->cartDiscount());
         $this->assertEquals(4.95, $cart->savings());
+
+        $this->assertEquals(4.95, Cart::instance('hello')->savings());
     }
 
-    public function test_it_can_add_a_valid_value_coupon_per_item()
+    public function test_add_valid_value_coupon_per_item()
     {
         $this->setConfigFormat(2, '.', '');
 
-        $cartItem = Cart::instance()->add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cartItem = Cart::add(new BuyableProduct(1, 'First item', 10.00), 2);
+
         $cartItem->setTaxRate(19);
-        $cartItem->addCouponType('value', ['value' => 4.95]);
+
+        Cart::addCouponType('value', ['value' => 4.95]);
+
         $this->assertEquals(10.00, $cartItem->price());
         $this->assertEquals(11.90, $cartItem->priceTax());
         $this->assertEquals(20.00, $cartItem->subtotal());
@@ -294,7 +300,44 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(4.95, Cart::savings());
     }
 
-    public function test_it_can_add_a_valid_value_and_percentage_coupon()
+    public function test_add_valid_percentage_coupon_per_item()
+    {
+        $this->setConfigFormat(2, '.', '');
+
+        $cartItem = Cart::add(new BuyableProduct(1, 'First item', 10.00), 2);
+        $cartItem2 = Cart::add(new BuyableProduct(2, 'First item', 20.00), 2);
+
+        $cartItem->setTaxRate(19);
+
+        Cart::addCouponType('percentage', ['value' => 0.1, 'validProducts' => [$cartItem->rowId]]);
+        $cartItem = Cart::get($cartItem);
+
+        $this->assertEquals(10.00, $cartItem->unitPrice());
+        $this->assertEquals(9.00, $cartItem->price());
+        $this->assertEquals(10.71, $cartItem->priceTax());
+        $this->assertEquals(18.00, $cartItem->subtotal());
+        $this->assertEquals(21.42, $cartItem->total());
+        $this->assertEquals(1.71, $cartItem->tax());
+        $this->assertEquals(3.42, $cartItem->taxTotal());
+        $this->assertEquals(2.38, $cartItem->lineDiscount());
+
+        $this->assertEquals(20.00, $cartItem2->unitPrice());
+        $this->assertEquals(20.00, $cartItem2->price());
+        $this->assertEquals(24.20, $cartItem2->priceTax());
+        $this->assertEquals(40.00, $cartItem2->subtotal());
+        $this->assertEquals(48.40, $cartItem2->total());
+        $this->assertEquals(4.20, $cartItem2->tax());
+        $this->assertEquals(8.40, $cartItem2->taxTotal());
+        $this->assertEquals(0.00, $cartItem2->lineDiscount());
+
+        $this->assertEquals(58.00, Cart::instance()->subtotal());
+        $this->assertEquals(69.82, Cart::total());
+        $this->assertEquals(11.82, Cart::tax());
+        $this->assertEquals(0.00, Cart::cartDiscount());
+        $this->assertEquals(2.38, Cart::savings());
+    }
+
+    public function test_add_valid_value_and_percentage_coupons()
     {
         config(['cart.coupon.allow_multiple' => true]);
 
@@ -325,7 +368,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(7.33, $cart->savings());
     }
 
-    public function test_allow_only_one_coupon_if_multiple_disabled_in_config_percentage()
+    public function test_allow_single_percentage_coupon_when_multiple_disabled()
     {
         config(['cart.coupon.allow_multiple' => false]);
         $this->setConfigFormat(2, '.', '');
@@ -355,7 +398,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(2.38, $cart->savings());
     }
 
-    public function test_allow_only_one_coupon_if_multiple_disabled_in_config_value()
+    public function test_allow_single_value_coupon_when_multiple_disabled()
     {
         config(['cart.coupon.allow_multiple' => false]);
         $this->setConfigFormat(2, '.', '');
@@ -385,7 +428,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(4.95, $cart->savings());
     }
 
-    public function test_percentage_fee_can_be_added_to_cart()
+    public function test_add_percentage_fee()
     {
         $this->setConfigFormat(2, '.', '');
 
@@ -393,7 +436,8 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cartItem = $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
         $cartItem->setTaxRate(19);
 
-        $fee = new CartFee('merchant', 'percentage', 0.05);
+        $fee = new CartFee('merchant', 0.05, 'percentage');
+
         $cart->addFee($fee);
 
         $this->assertEquals(10.00, $cartItem->price());
@@ -420,7 +464,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $item1 = $cart->add(new BuyableProduct(1, 'First item', 10.00), 2);
         $item1->setTaxRate(19);
 
-        $fee = new CartFee('delivery', 'value', 30, ['taxable' => true]);
+        $fee = new CartFee('delivery', 30, 'value',  ['taxable' => true]);
         $cartItem = $cart->addFee($fee);
         $cartItem->setTaxRate(19);
 
@@ -440,7 +484,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(0.00, $cart->savings());
     }
 
-    public function test_non_taxable_value_fee_can_be_added_to_cart()
+    public function test_add_non_taxable_value_fee()
     {
         $this->setConfigFormat(2, '.', '');
 
@@ -449,7 +493,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $cartItem = $cart->add(new BuyableProduct(1, 'First item', 10.00, 19), 2);
         $cartItem->setTaxRate(19);
 
-        $fee = new CartFee('delivery', 'value', 30, ['taxRate' => 0]);
+        $fee = new CartFee('delivery', 30, 'value',  ['taxRate' => 0]);
         $cartItem2 = $cart->addFee($fee);
 
         $this->assertEquals(30.00, $cartItem2->price());
@@ -468,7 +512,7 @@ class ShoppingCartCouponFeeTest extends TestCase
         $this->assertEquals(0.00, $cart->savings());
     }
 
-    public function test_it_has_correct_values_without_discounts()
+    public function test_cart_values_without_discounts()
     {
         $this->setConfigFormat(2, '.', '');
 

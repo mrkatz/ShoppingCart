@@ -17,7 +17,7 @@ class CartFee extends Collection
 
     public $options;
 
-    public function __construct($name, $type = 'percentage', $value = 0.02, $options = [])
+    public function __construct($name, $value = 0.02, $type = 'percentage', $options = [])
     {
         if (!in_array($type, ['percentage', 'value'])) $this->throwError('Invalid Fee Type. Type should be "percentage" or "value"');
         if ($type === 'percentage' && $value > 1) $this->throwError('Invalid value for a percentage fee. The value must be between 0 and 1.');

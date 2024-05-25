@@ -10,6 +10,9 @@ use Illuminate\Support\Collection;
 use Mrkatz\Shoppingcart\Contracts\Buyable;
 use Mrkatz\Shoppingcart\Exceptions\InvalidRowIDException;
 use Mrkatz\Shoppingcart\Exceptions\UnknownModelException;
+use Mrkatz\Shoppingcart\Exceptions\UnknownPropertyException;
+
+use function Pest\Laravel\instance;
 
 class Cart
 {
@@ -28,6 +31,8 @@ class Cart
         $this->events = $events;
 
         $this->instance(config('cart.instances.default', 'default'));
+        $this->cartFees = [];
+        $this->coupons = [];
     }
 
     public function instance($instance = null)
@@ -56,12 +61,29 @@ class Cart
 
     protected function getContent()
     {
-        $content = $this->session->has($this->instance)
-            ? $this->session->get($this->instance)
-            : new Collection;
+        if ($this->session->has($this->instance)) {
+            $cart = $this->session->get($this->instance);
+            $this->cartFees = $cart['fees'] ?? [];
+            $this->coupons = $cart['coupons'] ?? [];
+            $cartItems = $cart['cartItems'] ?? [];
 
-        return $content;
+            return new Collection($cartItems);
+        }
+
+        return new Collection;
     }
+
+    protected function storeContent($content)
+    {
+        $cartData = [
+            'fees' => $this->cartFees,
+            'coupons' => $this->coupons,
+            'cartItems' => $content
+        ];
+
+        $this->session->put($this->instance, $cartData);
+    }
+
 
     public function add($id, $name = null, $qty = null, $price = null, array $options = [], $taxrate = null)
     {
@@ -89,7 +111,7 @@ class Cart
 
         $this->events->dispatch('cart.added', $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->storeContent($content);
 
         return $cartItem;
     }
@@ -155,7 +177,7 @@ class Cart
 
         $this->events->dispatch('cart.updated', $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->storeContent($content);
 
         return $cartItem;
     }
@@ -182,7 +204,7 @@ class Cart
 
         $this->events->dispatch('cart.removed', $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->storeContent($content);
     }
 
     public function destroy()
@@ -211,12 +233,14 @@ class Cart
 
         $content->put($cartItem->rowId, $cartItem);
 
-        $this->session->put($this->instance, $content);
+        $this->storeContent($content);
     }
 
     //Coupons
     public function addCoupon(CartCoupon $coupon)
     {
+        $content = $this->getContent();
+
         if ($coupon->canApply($this)) {
 
             if (!config('cart.coupon.allow_multiple')) {
@@ -225,23 +249,53 @@ class Cart
 
             $this->coupons[$coupon->code] = $coupon;
 
-            $content = $this->getContent();
-
             foreach ($content as $cartItem) {
                 $cartItem->addCoupon($coupon);
             }
 
-            $this->discount = 0;
+            $this->updateDiscount();
 
-            foreach ($this->coupons as $coupon) {
-                if ($coupon->type === 'value') {
-                    $this->discount += $coupon->value;
-                }
-            }
-
+            $this->storeContent($content);
             return $this;
         }
         $coupon->throwError('Invalid Coupon');
+    }
+
+    public function addCouponType($type = null, $options = [])
+    {
+        switch ($type) {
+            case 'comparePrice':
+                $coupon = new CartCoupon(config('cart.compare_price.discount_code', today()->format('M') . 'only'), null, 'comparePrice', $options);
+                $this->addCoupon($coupon);
+                break;
+            case 'value':
+                $value = isset($options['value']) && is_numeric($options['value']) ? $options['value'] : null;
+                $code = isset($options['code']) ? $options['code'] : today()->format('M') . 'only' . $options['value'];
+
+                $coupon = new CartCoupon($code, $value, 'value', array_merge(['validProducts' => [$this->rowId]], $options));
+                $this->addCoupon($coupon);
+                break;
+            case 'percentage':
+                $value = isset($options['value']) && is_numeric($options['value']) && $options['value'] < 1.0 ? $options['value'] : null;
+                $code = isset($options['code']) ? $options['code'] : today()->format('M') . 'only' . ($options['value'] * 100) . '%';
+
+                $coupon = new CartCoupon($code, $value, 'percentage', array_merge(['validProducts' => [$this->rowId]], $options));
+                $this->addCoupon($coupon);
+                break;
+            default:
+                return $this;
+        }
+    }
+
+    protected function updateDiscount()
+    {
+        $this->discount = 0;
+
+        foreach ($this->coupons as $coupon) {
+            if ($coupon->type === 'value') {
+                $this->discount += $coupon->value;
+            }
+        }
     }
 
     public function clearCoupons()
@@ -251,15 +305,21 @@ class Cart
             $cartItem->coupons = [];
         }
         $this->coupons = [];
+        $this->discount = 0;
+
+        $this->storeContent($content);
     }
 
     public function addFee(CartFee $fee)
     {
+        $content = $this->getContent();
         if ($fee->type === 'value') return $this->add($fee, $fee->name, 1, ['price' => $fee->value, 'comparePrice' => ''], $fee->options->toArray());
         $this->cartFees[$fee->name] = $fee;
-
+        $cartFees = $this->cartFees;
         $this->updateFees();
 
+        $this->cartFees = $cartFees;
+        $this->storeContent($content);
         return $this;
     }
 
@@ -274,14 +334,12 @@ class Cart
     protected function updateFees()
     {
         $this->fee = 0.00;
-
-        foreach ($this->cartFees as $fee) {
-            if ($fee->type === 'value') {
-                // $this->fee += $fee->value;
-            } else {
-                $this->fee += $this->total() * $fee->value;
+        $cartfees = $this->cartFees;
+        foreach ($cartfees as $fee) {
+            if ($fee->type !== 'value') {
+                $this->fee += $this->total(false, ['discount' => false, 'fees' => false]) * $fee->value;
             }
-        }
+        };
     }
 
     //Database
@@ -304,9 +362,18 @@ class Cart
         return config('cart.database.table.shoppingcart', 'shoppingcart');
     }
 
-    public function store($identifier)
+    public function databaseStoreBlock()
     {
-        $content = $this->getContent();
+        $cartData = ['content' => $this->getContent()];
+
+        if (config('cart.database.store.fees', true)) $cartData['fees'] = $this->cartFees;
+        if (config('cart.database.store.coupon', true)) $cartData['coupon'] = $this->coupons;
+        return $cartData;
+    }
+
+    public function store($identifier, $cartData = null)
+    {
+        if (is_null($cartData)) $cartData = $this->databaseStoreBlock();
 
         $this->getConnection()
             ->table($this->getTableName())
@@ -318,7 +385,7 @@ class Cart
         $this->getConnection()->table($this->getTableName())->insert([
             'identifier' => $identifier,
             'instance' => $this->currentInstance(),
-            'content' => serialize($content),
+            'content' => serialize($cartData),
             'created_at' => new \DateTime()
         ]);
 
@@ -343,15 +410,18 @@ class Cart
 
         $content = $this->getContent();
 
-        foreach ($storedContent as $cartItem) {
+        foreach ($storedContent['content'] as $cartItem) {
             $content->put($cartItem->rowId, $cartItem);
         }
 
+        $this->cartFees = $storedContent['fees'];
+        $this->coupons = $storedContent['coupon'];
+
         $this->events->dispatch('cart.restored');
 
-        $this->session->put($this->instance, $content);
-
         $this->instance($currentInstance);
+
+        $this->storeContent($content);
     }
 
     public function deleteStoredCart($identifier)
@@ -378,13 +448,17 @@ class Cart
     {
         $value = is_string($value) ? $this->$value : $value;
 
+        if (floatval($value) === 0.0) return config('cart.format.on_zero', 0);
+
         if (is_null($decimals)) $decimals = config('cart.format.decimals', 2);
 
         if (is_null($decimalPoint)) $decimalPoint = config('cart.format.decimal_point', '.');
 
         if (is_null($thousandSeperator)) $thousandSeperator = config('cart.format.thousand_seperator', ',');
 
-        return number_format($value, $decimals, $decimalPoint, $thousandSeperator);
+        $prepend = config('cart.format.prepend', '');
+
+        return $prepend . number_format($value, $decimals, $decimalPoint, $thousandSeperator);
     }
 
     public function __get($attribute)
@@ -414,7 +488,8 @@ class Cart
 
         $content->put($cartItem->rowId, $cartItem);
 
-        $this->session->put($this->instance, $content);
+        // $this->session->put($this->instance, $content);
+        $this->storeContent($content);
 
         return $this;
     }
@@ -445,7 +520,7 @@ class Cart
             return $total + ($cartItem->qty * $cartItem->priceTax(false));
         }, 0);
 
-        if ($options['discount']) $total -= $this->discount;
+        if ($options['discount']) $total -= $this->cartDiscount(false);
         if ($options['fees']) $total += $this->fee;
 
         if ($format) return $this->format($total);
@@ -478,6 +553,8 @@ class Cart
 
     public function cartDiscount($format = true)
     {
+        $this->updateDiscount();
+
         if ($format) return $this->format($this->discount);
         return $this->discount;
     }
@@ -487,7 +564,7 @@ class Cart
         $content = $this->getContent();
 
         $savings = $content->reduce(function ($savings, CartItem $cartItem) {
-            return $savings + $cartItem->lineDiscount();
+            return $savings + $cartItem->lineDiscount(false);
         }, 0);
 
         $savings += $this->cartDiscount(false);
@@ -506,5 +583,26 @@ class Cart
 
         if ($format) return $this->format($compare);
         return $compare;
+    }
+
+    public function withInstance($instances, $value, $format = true, $options = ['discount' => true, 'fees' => true])
+    {
+        if (!in_array($value, ['total', 'count', 'tax', 'subtotal', 'cartDiscount', 'cartFees', 'savings', 'comparePrice'])) {
+            throw new UnknownPropertyException($value . ' is not a valid property on Multi-instance method');
+        }
+        $sum = array_sum(array_map(
+            fn ($instance) => $this->instance($instance)->$value(false, $value === 'total' ? $options : null),
+            $instances
+        ));
+        // $sum = 0.0;
+        // foreach ($instances as $instance) {
+        //     $cartInstance = $this->instance($instance);
+        //     if ($value === 'total') {
+        //         $sum += $cartInstance->$value(false, $options);
+        //     } else {
+        //         $sum += $cartInstance->$value(false);
+        //     }
+        // }
+        return $format ? $this->format($sum) : $sum;
     }
 }
