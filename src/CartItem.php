@@ -117,6 +117,30 @@ class CartItem implements Arrayable, Jsonable
         return $this;
     }
 
+    public function model($withRelationship = null)
+    {
+        if (isset($this->associatedModel)) {
+            return once(function () use ($withRelationship) {
+                $query = with(new $this->associatedModel)->newQuery();
+
+                if (!is_null($withRelationship) && !empty($withRelationship)) {
+                    $relationships = is_array($withRelationship) ? $withRelationship : explode('.', $withRelationship);
+                    $query->with($relationships);
+                }
+
+                $model = $query->findOrFail($this->id);
+
+                if (!is_null($withRelationship) && !empty($withRelationship)) {
+                    $model->loadMissing($relationships);
+                }
+
+                return $model;
+            });
+        } else {
+            return null;
+        }
+    }
+
     public function setTaxRate($taxRate)
     {
         $this->taxRate = $taxRate;
