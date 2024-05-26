@@ -10,6 +10,7 @@ use Mrkatz\Shoppingcart\Listener\ShoppingCartEventListener;
 
 class ShoppingcartServiceProvider extends ServiceProvider
 {
+    protected $config = __DIR__ . '/../config/cart.php';
     public function register()
     {
         $this->app->singleton(Cart::class, function () {
@@ -17,9 +18,8 @@ class ShoppingcartServiceProvider extends ServiceProvider
         });
         $this->app->alias(Cart::class, 'cart');
 
-        $config = __DIR__ . '/../config/cart.php';
-        $this->mergeConfigFrom($config, 'cart');
-        $this->publishes([__DIR__ . '/../config/cart.php' => config_path('cart.php')], 'config');
+
+        $this->mergeConfigFrom($this->config, 'cart');
 
         $this->registerMigrations();
     }
@@ -27,15 +27,15 @@ class ShoppingcartServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->registerEventListeners();
+        $this->publishes([$this->config => config_path('cart.php')], 'config');
+        $this->publishes([
+            '/database/migrations' => database_path('migrations/'),
+        ], 'migrations');
     }
 
     protected function registerMigrations()
     {
         $this->loadMigrationsFrom(__DIR__ . '/database/migrations');
-
-        $this->publishes([
-            '/database/migrations' => database_path('migrations/'),
-        ], 'migrations');
     }
 
     protected function registerEventListeners()

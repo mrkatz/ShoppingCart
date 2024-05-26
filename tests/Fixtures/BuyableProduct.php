@@ -72,7 +72,7 @@ class BuyableProduct implements Buyable
             $this->price = floatval($price);
         }
     }
-    public function price($format)
+    public function price($format = false)
     {
         return $this->price;
     }
@@ -84,12 +84,12 @@ class BuyableProduct implements Buyable
         return $price;
     }
 
-    public function taxable($format)
+    public function taxable($format = false)
     {
         return $this->taxable;
     }
 
-    public function comparePrice($format)
+    public function comparePrice($format = false)
     {
         return $this->comparePrice;
     }

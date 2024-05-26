@@ -33,7 +33,7 @@ class CartItem implements Arrayable, Jsonable
     protected $maxDiscount;
     public $fees = [];
 
-    private $taxable = true;
+    public $taxable = true;
     private $taxRate = 0;
 
     public $options;
@@ -85,7 +85,6 @@ class CartItem implements Arrayable, Jsonable
         $this->rowId = $this->generateRowId($id, $options);
 
         if ($addAutoCompareCoupon) {
-
             $discountVal = 1 - ($priceVal / $comparePrice);
             $coupon = new CartCoupon(config('cart.compare_price.discount_code', today()->format('M') . 'only'), $discountVal, 'percentage', ['validProducts' => [$this->rowId]]);
             $this->addCoupon($coupon);
@@ -100,12 +99,14 @@ class CartItem implements Arrayable, Jsonable
     protected function updateOptions()
     {
         $splitFromOptions = [];
+
         foreach ($this->options as $option => $value) {
             if (property_exists($this, $option)) {
                 $this->$option = $value;
                 $splitFromOptions[] = $option;
             }
         };
+
         $this->options = new CartItemOptions(collect($this->options)->forget($splitFromOptions));
     }
 
@@ -119,8 +120,13 @@ class CartItem implements Arrayable, Jsonable
     public function setTaxRate($taxRate)
     {
         $this->taxRate = $taxRate;
-        if ($taxRate === 0) $this->taxable = false;
-        if ($taxRate > 0) $this->taxable = true;
+
+        return $this;
+    }
+
+    public function setTaxable($taxable)
+    {
+        $this->taxable = $taxable;
 
         return $this;
     }
@@ -334,7 +340,9 @@ class CartItem implements Arrayable, Jsonable
         }
 
         if ($attribute === 'model' && isset($this->associatedModel)) {
-            return with(new $this->associatedModel)->find($this->id);
+            return once(function () {
+                return with(new $this->associatedModel)->find($this->id);
+            });
         }
 
         return null;

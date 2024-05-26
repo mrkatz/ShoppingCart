@@ -329,6 +329,21 @@ class ShoppingCartTest extends TestCase
         $this->assertRowsInCart(1, $cart);
     }
 
+    public function test_it_can_update_qty_via_the_cart_object_and_cartitem()
+    {
+        $cart = $this->getCart();
+
+        $cartItem = $cart->add(new BuyableProduct);
+        $this->assertItemsInCart(1, $cart);
+        $this->assertRowsInCart(1, $cart);
+        $cart->update($cartItem->rowId, 4);
+        $this->assertItemsInCart(4, $cart);
+        $this->assertRowsInCart(1, $cart);
+        $cartItem->setQuantity(2);
+        $this->assertItemsInCart(2, $cart);
+        $this->assertRowsInCart(1, $cart);
+    }
+
     public function test_it_will_keep_updating_the_quantity_when_an_item_is_added_multiple_times()
     {
         $cart = $this->getCart();
@@ -715,13 +730,13 @@ class ShoppingCartTest extends TestCase
 
     public function test_it_can_calculate_tax_based_on_the_default_tax_rate_in_the_config()
     {
-        config(['cart.tax' => 21]);
+        config(['cart.tax' => 10]);
 
         $cart = $this->getCart();
 
         $cartItem = $cart->add(new BuyableProduct(1, 'Some title', 10.00), 1);
 
-        $this->assertEquals(2.10, $cartItem->tax);
+        $this->assertEquals(1.00, $cartItem->tax);
     }
 
     public function test_it_can_set_tax_based_on_passed_in_options()
@@ -733,6 +748,20 @@ class ShoppingCartTest extends TestCase
         $cartItem =  $cart->add(new BuyableProduct(1, 'Some title', 10.00), 1);
 
         $this->assertEquals(2.10, $cartItem->tax);
+    }
+
+    public function test_setting_taxable_to_false_is_the_same_as_setting_taxrate_0()
+    {
+        config(['cart.tax' => 21]);
+
+        $cart = $this->getCart();
+
+        $cartItem =  $cart->add(new BuyableProduct(1, 'Some title', 10.00, false), 1);
+        $this->assertEquals(0.00, $cartItem->tax);
+        $cartItem->setTaxable(true);
+        $this->assertEquals(2.10, $cartItem->tax);
+        $cartItem->setTaxRate(0);
+        $this->assertEquals(0.00, $cartItem->tax);
     }
 
     public function test_it_can_calculate_tax_based_on_the_specified_tax_via_cart()

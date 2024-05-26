@@ -182,9 +182,9 @@ class Cart
         return $cartItem;
     }
 
-    public function get($rowId)
+    public function get($rowId, $content = null): CartItem
     {
-        $content = $this->getContent();
+        if (is_null($content)) $content = $this->getContent();
 
         $id = ($rowId instanceof CartItem) ? $rowId->rowId : $rowId;
 
@@ -480,11 +480,26 @@ class Cart
 
     public function setTax($rowId, $taxRate)
     {
-        $cartItem = $this->get($rowId);
+        $content = $this->getContent();
+
+        $cartItem = $this->get($rowId, $content);
 
         $cartItem->setTaxRate($taxRate);
 
+        $content->put($cartItem->rowId, $cartItem);
+
+        $this->storeContent($content);
+
+        return $this;
+    }
+
+    public function setTaxable($rowId, $taxable)
+    {
         $content = $this->getContent();
+
+        $cartItem = $this->get($rowId, $content);
+
+        $cartItem->setTaxable($taxable);
 
         $content->put($cartItem->rowId, $cartItem);
 
